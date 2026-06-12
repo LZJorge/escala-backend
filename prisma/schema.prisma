@@ -4,10 +4,332 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../prisma/generated/client"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum InstitutionType {
+  UNIVERSITY
+  HIGH_SCHOOL
+  INSTITUTE
+}
+
+enum TermType {
+  SEMESTER
+  QUARTER
+  YEAR
+}
+
+enum TermStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  DROPPED
+  WITHDRAWN
+}
+
+enum AssessmentType {
+  EXAM
+  ESSAY
+  PRESENTATION
+  PROJECT
+}
+
+enum FileType {
+  PDF
+  DOCX
+  TXT
+  IMAGE
+}
+
+enum TranscriptStatus {
+  PASSED
+  FAILED
+  WITHDRAWN
+}
+
+/* Stores global identity credentials used for authentication across all tenants before resolving specific institutional permissions */
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  ci           String   @unique 
+  phone        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  institutionUsers InstitutionUser[]
+
+  @@map("users")
+}
+
+model Institution {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  institutionType InstitutionType @map("institution_type")
+  contactEmail    String          @map("contact_email")
+  websiteUrl      String?         @map("website_url")
+  logoUrl         String?         @map("logo_url") 
+  isVerified      Boolean         @default(false) @map("is_verified")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  users    InstitutionUser[]
+  roles    Role[]
+  programs AcademicProgram[]
+  terms    Term[]
+
+  @@map("institutions")
+}
+
+/* Acts as the multi tenant pivot linking a global identity to a specific organization allowing a single account to hold distinct roles across different schools */
+model InstitutionUser {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  institutionId String   @map("institution_id") @db.Uuid
+  isActive      Boolean  @default(true) @map("is_active")
+  joinedAt      DateTime @default(now()) @map("joined_at")
+
+  user        User                  @relation(fields: [userId], references: [id])
+  institution Institution           @relation(fields: [institutionId], references: [id])
+  roles       InstitutionUserRole[]
+
+  sectionsTaught        CourseSection[]        @relation("TeacherSections")
+  enrollments           Enrollment[]           @relation("StudentEnrollments")
+  assessmentSubmissions AssessmentSubmission[] @relation("StudentSubmissions")
+  transcripts           Transcript[]           @relation("StudentTranscripts")
+
+  @@unique([userId, institutionId])
+  @@map("institution_users")
+}
+
+/* Scopes authorization levels per institution to support custom organizational structures while permitting global defaults when the organization reference is null */
+model Role {
+  id            String   @id @default(uuid()) @db.Uuid
+  institutionId String?  @map("institution_id") @db.Uuid
+  name          String
+  isStudent     Boolean  @default(false) @map("is_student")
+  isMaster      Boolean  @default(false) @map("is_master")
+  isEditable    Boolean  @default(true) @map("is_editable")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  institution Institution?          @relation(fields: [institutionId], references: [id])
+  permissions RolePermission[]
+  users       InstitutionUserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique 
+  module      String 
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+/* Creates a many to many mapping that binds specific fine grained application capabilities to organizational roles */
+model RolePermission {
+  id           String @id @default(uuid()) @db.Uuid
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model InstitutionUserRole {
+  id                String @id @default(uuid()) @db.Uuid
+  institutionUserId String @map("institution_user_id") @db.Uuid
+  roleId            String @map("role_id") @db.Uuid
+
+  institutionUser InstitutionUser @relation(fields: [institutionUserId], references: [id], onDelete: Cascade)
+  role            Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([institutionUserId, roleId])
+  @@map("institution_user_roles")
+}
+
+model AcademicProgram {
+  id            String   @id @default(uuid()) @db.Uuid
+  institutionId String   @map("institution_id") @db.Uuid
+  name          String
+  termType      TermType @map("term_type")
+  totalCredits  Int      @map("total_credits")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  institution Institution @relation(fields: [institutionId], references: [id])
+  courses     Course[]
+
+  @@map("academic_programs")
+}
+
+/* Defines the abstract academic subject within a program curriculum independent of specific calendar terms or teaching staff assignments */
+model Course {
+  id        String  @id @default(uuid()) @db.Uuid
+  programId String  @map("program_id") @db.Uuid
+  code      String 
+  name      String
+  credits   Int
+  termLevel Int     @map("term_level")
+  isActive  Boolean @default(true) @map("is_active")
+
+  program     AcademicProgram @relation(fields: [programId], references: [id])
+  sections    CourseSection[]
+  transcripts Transcript[]
+
+  prerequisites     CoursePrerequisite[] @relation("CoursePrerequisites")
+  requiredByCourses CoursePrerequisite[] @relation("RequiredCourses")
+
+  @@map("courses")
+}
+
+/* Handles complex academic chain dependencies permitting a course to block registration until specific prior conditions or credit thresholds are satisfied */
+model CoursePrerequisite {
+  id               String  @id @default(uuid()) @db.Uuid
+  courseId         String  @map("course_id") @db.Uuid
+  requiredCourseId String? @map("required_course_id") @db.Uuid
+  requiredCredits  Int?    @map("required_credits")
+
+  course         Course  @relation("CoursePrerequisites", fields: [courseId], references: [id])
+  requiredCourse Course? @relation("RequiredCourses", fields: [requiredCourseId], references: [id])
+
+  @@map("course_prerequisites")
+}
+
+model Term {
+  id            String     @id @default(uuid()) @db.Uuid
+  institutionId String     @map("institution_id") @db.Uuid
+  name          String 
+  startDate     DateTime   @map("start_date")
+  endDate       DateTime   @map("end_date")
+  status        TermStatus @default(UPCOMING)
+
+  institution Institution     @relation(fields: [institutionId], references: [id])
+  sections    CourseSection[]
+  transcripts Transcript[]
+
+  @@map("terms")
+}
+
+/* Represents a concrete instance of a course offered during a specific academic term assigned to a designated teacher with capped enrollment capacity */
+model CourseSection {
+  id        String @id @default(uuid()) @db.Uuid
+  courseId  String @map("course_id") @db.Uuid
+  termId    String @map("term_id") @db.Uuid
+  teacherId String @map("teacher_id") @db.Uuid
+  name      String 
+  capacity  Int
+
+  course      Course            @relation(fields: [courseId], references: [id])
+  term        Term              @relation(fields: [termId], references: [id])
+  teacher     InstitutionUser   @relation("TeacherSections", fields: [teacherId], references: [id])
+  schedules   SectionSchedule[]
+  enrollments Enrollment[]
+  assessments Assessment[]
+
+  @@map("course_sections")
+}
+
+/* Maps recurring weekly time slots to a section using native database time types to enable calendar rendering and conflict detection */
+model SectionSchedule {
+  id             String    @id @default(uuid()) @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  dayOfWeek      DayOfWeek @map("day_of_week")
+  startTime      DateTime  @map("start_time") @db.Time()
+  endTime        DateTime  @map("end_time") @db.Time()
+  roomIdentifier String?   @map("room_identifier")
+
+  section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@map("section_schedules")
+}
+
+/* Tracks the active registration state and lifecycle of a student within a specific class instance for a given term */
+model Enrollment {
+  id         String           @id @default(uuid()) @db.Uuid
+  sectionId  String           @map("section_id") @db.Uuid
+  studentId  String           @map("student_id") @db.Uuid
+  status     EnrollmentStatus @default(ENROLLED)
+  enrolledAt DateTime         @default(now()) @map("enrolled_at")
+
+  section CourseSection   @relation(fields: [sectionId], references: [id])
+  student InstitutionUser @relation("StudentEnrollments", fields: [studentId], references: [id])
+
+  @@unique([sectionId, studentId])
+  @@map("enrollments")
+}
+
+/* Establishes a graded deliverable item within a section carrying a specific proportional weight toward the cumulative final grade calculation */
+model Assessment {
+  id               String         @id @default(uuid()) @db.Uuid
+  sectionId        String         @map("section_id") @db.Uuid
+  title            String
+  description      String?
+  assessmentType   AssessmentType @map("assessment_type")
+  weightPercentage Decimal        @map("weight_percentage") @db.Decimal(5, 2)
+  dueDate          DateTime       @map("due_date")
+
+  section     CourseSection          @relation(fields: [sectionId], references: [id])
+  submissions AssessmentSubmission[]
+
+  @@map("assessments")
+}
+
+model AssessmentSubmission {
+  id              String   @id @default(uuid()) @db.Uuid
+  assessmentId    String   @map("assessment_id") @db.Uuid
+  studentId       String   @map("student_id") @db.Uuid
+  fileUrl         String   @map("file_url") 
+  fileType        FileType @map("file_type")
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+  grade           Decimal? @db.Decimal(4, 2) 
+  teacherFeedback String?  @map("teacher_feedback")
+
+  assessment Assessment      @relation(fields: [assessmentId], references: [id])
+  student    InstitutionUser @relation("StudentSubmissions", fields: [studentId], references: [id])
+
+  @@unique([assessmentId, studentId])
+  @@map("assessment_submissions")
+}
+
+/* Serves as the permanent immutable academic record of completed courses ensuring historical grade data is preserved even if sections or programs change later */
+model Transcript {
+  id         String           @id @default(uuid()) @db.Uuid
+  studentId  String           @map("student_id") @db.Uuid
+  courseId   String           @map("course_id") @db.Uuid
+  termId     String           @map("term_id") @db.Uuid
+  finalGrade Decimal          @map("final_grade") @db.Decimal(4, 2) 
+  status     TranscriptStatus
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  student InstitutionUser @relation("StudentTranscripts", fields: [studentId], references: [id])
+  course  Course          @relation(fields: [courseId], references: [id])
+  term    Term            @relation(fields: [termId], references: [id])
+
+  @@map("transcripts")
 }

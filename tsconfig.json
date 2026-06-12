@@ -20,9 +20,14 @@
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": false,
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "paths": {
+      "@prisma/*": ["./prisma/generated/*"],
+      "@core/*": ["./src/core/*"],
+      "@modules/*": ["./src/modules/*"]
+    }
   }
 }
