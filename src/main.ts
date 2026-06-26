@@ -19,8 +19,18 @@ async function bootstrap(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle('Escala API')
-    .setDescription('Academic management system API')
+    .setDescription(
+      'Enterprise-grade, multi-tenant academic administration system.\n\n' +
+        'Built with Clean Architecture (Hexagonal / Vertical Slicing), DDD principles, ' +
+        'and strict TypeScript. Tenants are fully isolated, RBAC is granular, ' +
+        'and academic schedules use mathematical validation.',
+    )
     .setVersion('0.0.1')
+    .setContact(
+      'Jorge Landaeta',
+      'https://github.com/LZJorge',
+      'dev.jorge2003@hotmail.com',
+    )
     .addBearerAuth()
     .build();
 
@@ -32,6 +42,8 @@ async function bootstrap(): Promise<void> {
 
   SwaggerModule.setup('api/docs', app, document, {
     customSiteTitle: 'Escala API',
+    customfavIcon: `data:image/x-icon;base64,${readFileSync(resolve('docs/public/assets/favicon.ico')).toString('base64')}`,
+    swaggerOptions: { docExpansion: 'none' },
     customCss: `
       .topbar-wrapper .link { content: '' !important; }
       .topbar-wrapper a.link img { display: none; }

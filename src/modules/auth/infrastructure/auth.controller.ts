@@ -9,6 +9,7 @@ import {
 import { ApiTags, ApiOperation, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from '../application/auth.service';
 import { LoginDto } from '../application/login.dto';
+import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -24,6 +25,7 @@ export class AuthController {
   @ApiOkResponse({
     description: 'Token + user profile + institution (null for super admin)',
   })
+  @ApiErrors(401)
   public async login(@Body() body: LoginDto): Promise<{
     accessToken: string;
     user: {

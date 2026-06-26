@@ -19,6 +19,7 @@ import type { AuthenticatedRequest } from '@modules/auth/infrastructure/authenti
 import { UserService } from '../application/user.service';
 import { UpdateProfileDto } from '../application/update-profile.dto';
 import { UserProfileDto } from '../application/user-profile.dto';
+import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -30,6 +31,7 @@ export class UserController {
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiOkResponse({ type: UserProfileDto })
+  @ApiErrors(401, 404)
   public async getProfile(
     @Req() request: AuthenticatedRequest,
   ): Promise<UserProfileDto> {
@@ -43,6 +45,7 @@ export class UserController {
   @Patch('me')
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiOkResponse({ type: UserProfileDto })
+  @ApiErrors(401, 404, 422)
   public async updateProfile(
     @Req() request: AuthenticatedRequest,
     @Body() body: UpdateProfileDto,

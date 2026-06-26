@@ -20,6 +20,7 @@ import {
   CreateInstitutionDto,
   CreateInstitutionUserDto,
 } from '../application/institution.dto';
+import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 
 @ApiTags('Institutions')
 @Controller('institutions')
@@ -30,6 +31,7 @@ export class InstitutionController {
   @SuperAdmin()
   @ApiOperation({ summary: 'Create a new institution (super admin only)' })
   @ApiCreatedResponse({ description: 'Institution created' })
+  @ApiErrors(401, 403, 422)
   public async create(@Body() body: CreateInstitutionDto): Promise<{
     id: string;
     name: string;
@@ -57,6 +59,7 @@ export class InstitutionController {
   @Get(':id')
   @ApiOperation({ summary: 'Get institution by ID' })
   @ApiOkResponse({ description: 'Institution details' })
+  @ApiErrors(404)
   public async findById(@Param('id') id: string): Promise<{
     id: string;
     name: string;
@@ -79,6 +82,7 @@ export class InstitutionController {
   @ApiOperation({
     summary: 'Create a user within the institution (admin only)',
   })
+  @ApiErrors(401, 403, 422)
   public async createUser(
     @Param('institutionId') institutionId: string,
     @Body() body: CreateInstitutionUserDto,
