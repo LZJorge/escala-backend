@@ -4,7 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Result } from '@core/domain/result';
 import { AUTH_REPOSITORY } from '../domain/auth.repository';
 import type { AuthRepository } from '../domain/auth.repository';
-import { User } from '../domain/user.entity';
+import { User } from '@core/domain/user.entity';
 
 @Injectable()
 export class AuthService {

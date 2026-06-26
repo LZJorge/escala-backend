@@ -1,4 +1,4 @@
-import { Entity } from '@core/domain/entity.base';
+import { Entity } from './entity.base';
 
 export interface UserProps {
   email: string;
