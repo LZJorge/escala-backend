@@ -23,7 +23,10 @@ interface AuthenticatedRequest extends Request {
   user: { sub: string; email: string };
 }
 import { InstitutionService } from '../application/institution.service';
-import { CreateInstitutionDto } from '../application/institution.dto';
+import {
+  CreateInstitutionDto,
+  CreateInstitutionUserDto,
+} from '../application/institution.dto';
 
 @ApiTags('Institutions')
 @Controller('institutions')
@@ -86,15 +89,7 @@ export class InstitutionController {
   public async createUser(
     @Req() request: AuthenticatedRequest,
     @Param('institutionId') institutionId: string,
-    @Body()
-    body: {
-      email: string;
-      password: string;
-      firstName: string;
-      lastName: string;
-      ci: string;
-      phone?: string;
-    },
+    @Body() body: CreateInstitutionUserDto,
   ): Promise<{
     id: string;
     email: string;
