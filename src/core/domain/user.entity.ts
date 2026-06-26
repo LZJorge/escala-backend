@@ -8,6 +8,7 @@ export interface UserProps {
   ci: string;
   phone: string | null;
   isSuperAdmin: boolean;
+  institutionId: string | null;
 }
 
 export class User extends Entity<UserProps> {
@@ -37,5 +38,9 @@ export class User extends Entity<UserProps> {
 
   public get isSuperAdmin(): boolean {
     return this.props.isSuperAdmin;
+  }
+
+  public get institutionId(): string | null {
+    return this.props.institutionId;
   }
 }

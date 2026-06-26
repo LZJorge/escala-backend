@@ -62,6 +62,7 @@ export class UserService {
         ci: user.ci,
         phone: params.phone !== undefined ? params.phone : user.phone,
         isSuperAdmin: user.isSuperAdmin,
+        institutionId: user.institutionId,
       },
       user.id,
     );

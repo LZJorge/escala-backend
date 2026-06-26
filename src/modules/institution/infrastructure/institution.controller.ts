@@ -33,6 +33,7 @@ export class InstitutionController {
   public async create(@Body() body: CreateInstitutionDto): Promise<{
     id: string;
     name: string;
+    slug: string;
     institutionType: string;
     contactEmail: string;
   }> {
@@ -47,7 +48,7 @@ export class InstitutionController {
   @ApiOperation({ summary: 'List all institutions' })
   @ApiOkResponse({ description: 'Array of institutions' })
   public async findAll(): Promise<
-    Array<{ id: string; name: string; institutionType: string }>
+    Array<{ id: string; name: string; slug: string; institutionType: string }>
   > {
     const result = await this.institutionService.findAll();
     return result.value;
@@ -59,6 +60,7 @@ export class InstitutionController {
   public async findById(@Param('id') id: string): Promise<{
     id: string;
     name: string;
+    slug: string;
     institutionType: string;
     contactEmail: string;
     websiteUrl: string | null;

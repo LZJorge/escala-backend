@@ -43,6 +43,12 @@ export class CreateInstitutionDto {
   @IsNotEmpty()
   public readonly name: string;
 
+  @ApiPropertyOptional({ example: 'universidad-central-de-venezuela' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly slug?: string;
+
   @ApiProperty({
     enum: ['UNIVERSITY', 'HIGH_SCHOOL', 'INSTITUTE'],
     example: 'UNIVERSITY',
@@ -108,6 +114,12 @@ export class UpdateInstitutionDto {
   @IsString()
   @IsNotEmpty()
   public readonly name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  public readonly slug?: string;
 
   @ApiPropertyOptional({ enum: ['UNIVERSITY', 'HIGH_SCHOOL', 'INSTITUTE'] })
   @IsOptional()

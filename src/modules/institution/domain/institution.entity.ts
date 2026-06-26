@@ -3,6 +3,7 @@ import type { InstitutionType } from '@prisma/client';
 
 export interface InstitutionProps {
   name: string;
+  slug: string;
   institutionType: InstitutionType;
   contactEmail: string;
   websiteUrl: string | null;
@@ -13,6 +14,10 @@ export interface InstitutionProps {
 export class Institution extends Entity<InstitutionProps> {
   public get name(): string {
     return this.props.name;
+  }
+
+  public get slug(): string {
+    return this.props.slug;
   }
 
   public get institutionType(): InstitutionType {

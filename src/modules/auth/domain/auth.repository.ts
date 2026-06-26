@@ -10,6 +10,6 @@ export interface InstitutionMembership {
 }
 
 export interface AuthRepository {
-  findByEmail(email: string): Promise<User | null>;
-  findUserInstitutions(userId: string): Promise<InstitutionMembership[]>;
+  findByEmail(email: string, institutionId?: string): Promise<User | null>;
+  findInstitutionById(id: string): Promise<InstitutionMembership | null>;
 }

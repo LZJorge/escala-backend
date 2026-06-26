@@ -60,7 +60,9 @@ async function seed(): Promise<void> {
   console.log(`✅ ${PERMISSIONS.length} permissions seeded.`);
 
   const superAdminEmail = 'admin@escala.app';
-  const existing = await prisma.user.findUnique({ where: { email: superAdminEmail } });
+  const existing = await prisma.user.findFirst({
+    where: { email: superAdminEmail, institutionId: null },
+  });
 
   if (!existing) {
     const salt = randomBytes(16).toString('hex');

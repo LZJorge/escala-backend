@@ -21,6 +21,7 @@ export class PrismaUserRepository implements UserRepository {
         ci: record.ci,
         phone: record.phone,
         isSuperAdmin: record.isSuperAdmin,
+        institutionId: record.institutionId,
       },
       record.id,
     );

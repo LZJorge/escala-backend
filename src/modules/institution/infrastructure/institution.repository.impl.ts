@@ -17,6 +17,7 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
     return new Institution(
       {
         name: record.name,
+        slug: record.slug,
         institutionType: record.institutionType,
         contactEmail: record.contactEmail,
         websiteUrl: record.websiteUrl,
@@ -36,6 +37,7 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
         new Institution(
           {
             name: r.name,
+            slug: r.slug,
             institutionType: r.institutionType,
             contactEmail: r.contactEmail,
             websiteUrl: r.websiteUrl,
@@ -52,6 +54,7 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
       data: {
         id: institution.id,
         name: institution.name,
+        slug: institution.slug,
         institutionType: institution.institutionType,
         contactEmail: institution.contactEmail,
         websiteUrl: institution.websiteUrl,
@@ -66,6 +69,7 @@ export class PrismaInstitutionRepository implements InstitutionRepository {
       where: { id: institution.id },
       data: {
         name: institution.name,
+        slug: institution.slug,
         institutionType: institution.institutionType,
         contactEmail: institution.contactEmail,
         websiteUrl: institution.websiteUrl,

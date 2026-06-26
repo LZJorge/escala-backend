@@ -16,7 +16,11 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  public async login(params: { email: string; password: string }): Promise<
+  public async login(params: {
+    email: string;
+    password: string;
+    institutionId?: string;
+  }): Promise<
     Result<{
       accessToken: string;
       user: {
@@ -26,7 +30,7 @@ export class AuthService {
         lastName: string;
         isSuperAdmin: boolean;
       };
-      institutions: InstitutionMembership[];
+      institution: InstitutionMembership | null;
     }>
   > {
     if (!params.email || !params.password) {
@@ -36,6 +40,21 @@ export class AuthService {
     const user = await this.authRepository.findByEmail(params.email);
     if (!user) {
       return Result.fail('Invalid email or password');
+    }
+
+    if (!user.isSuperAdmin) {
+      if (!params.institutionId) {
+        return Result.fail('Institution ID is required');
+      }
+      if (user.institutionId !== params.institutionId) {
+        return Result.fail('Invalid email or password');
+      }
+      const institution = await this.authRepository.findInstitutionById(
+        params.institutionId,
+      );
+      if (!institution) {
+        return Result.fail('Institution not found');
+      }
     }
 
     const [salt, storedHash] = user.passwordHash.split(':');
@@ -49,9 +68,10 @@ export class AuthService {
       return Result.fail('Invalid email or password');
     }
 
-    const institutions = await this.authRepository.findUserInstitutions(
-      user.id,
-    );
+    const institution =
+      user.institutionId !== null
+        ? await this.authRepository.findInstitutionById(user.institutionId)
+        : null;
 
     const accessToken = this.jwtService.sign({
       sub: user.id,
@@ -68,7 +88,7 @@ export class AuthService {
         lastName: user.lastName,
         isSuperAdmin: user.isSuperAdmin,
       },
-      institutions,
+      institution,
     });
   }
 }
