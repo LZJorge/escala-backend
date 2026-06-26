@@ -6,10 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
-
-interface AuthenticatedRequest extends Request {
-  user: { sub: string; email: string };
-}
+import type { AuthenticatedRequest } from './authenticated-request';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -22,9 +19,11 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      const payload = this.jwtService.verify<{ sub: string; email: string }>(
-        token,
-      );
+      const payload = this.jwtService.verify<{
+        sub: string;
+        email: string;
+        isSuperAdmin: boolean;
+      }>(token);
       request.user = payload;
       return true;
     } catch {

@@ -56,6 +56,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
+      isSuperAdmin: user.isSuperAdmin,
     });
 
     return Result.ok({

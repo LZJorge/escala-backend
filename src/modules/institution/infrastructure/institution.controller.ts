@@ -4,24 +4,17 @@ import {
   Post,
   Body,
   Param,
-  Req,
-  UseGuards,
   UnprocessableEntityException,
   NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
-  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
-import { JwtAuthGuard } from '@modules/auth/infrastructure/jwt-auth.guard';
-
-interface AuthenticatedRequest extends Request {
-  user: { sub: string; email: string };
-}
+import { SuperAdmin } from '@modules/auth/infrastructure/decorators/super-admin.decorator';
+import { MasterAdmin } from '@modules/auth/infrastructure/decorators/master-admin.decorator';
 import { InstitutionService } from '../application/institution.service';
 import {
   CreateInstitutionDto,
@@ -34,8 +27,7 @@ export class InstitutionController {
   constructor(private readonly institutionService: InstitutionService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @SuperAdmin()
   @ApiOperation({ summary: 'Create a new institution (super admin only)' })
   @ApiCreatedResponse({ description: 'Institution created' })
   public async create(@Body() body: CreateInstitutionDto): Promise<{
@@ -81,13 +73,11 @@ export class InstitutionController {
   }
 
   @Post(':institutionId/users')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @MasterAdmin()
   @ApiOperation({
     summary: 'Create a user within the institution (admin only)',
   })
   public async createUser(
-    @Req() request: AuthenticatedRequest,
     @Param('institutionId') institutionId: string,
     @Body() body: CreateInstitutionUserDto,
   ): Promise<{
@@ -98,7 +88,6 @@ export class InstitutionController {
     institutionUserId: string;
   }> {
     const result = await this.institutionService.createUser(
-      request.user.sub,
       institutionId,
       body,
     );

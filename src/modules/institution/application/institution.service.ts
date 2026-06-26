@@ -160,7 +160,6 @@ export class InstitutionService {
   }
 
   public async createUser(
-    requesterId: string,
     institutionId: string,
     params: {
       email: string;
@@ -179,23 +178,6 @@ export class InstitutionService {
       institutionUserId: string;
     }>
   > {
-    const membership = await this.prisma.institutionUser.findFirst({
-      where: { userId: requesterId, institutionId, isActive: true },
-    });
-    if (!membership) {
-      return Result.fail('You are not a member of this institution');
-    }
-
-    if (
-      !params.email ||
-      !params.password ||
-      !params.firstName ||
-      !params.lastName ||
-      !params.ci
-    ) {
-      return Result.fail('Missing required fields');
-    }
-
     const existingEmail = await this.prisma.user.findUnique({
       where: { email: params.email },
     });

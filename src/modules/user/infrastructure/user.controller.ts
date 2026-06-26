@@ -14,15 +14,11 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { JwtAuthGuard } from '@modules/auth/infrastructure/jwt-auth.guard';
+import type { AuthenticatedRequest } from '@modules/auth/infrastructure/authenticated-request';
 import { UserService } from '../application/user.service';
 import { UpdateProfileDto } from '../application/update-profile.dto';
 import { UserProfileDto } from '../application/user-profile.dto';
-
-interface AuthenticatedRequest extends Request {
-  user: { sub: string; email: string };
-}
 
 @ApiTags('Users')
 @ApiBearerAuth()
