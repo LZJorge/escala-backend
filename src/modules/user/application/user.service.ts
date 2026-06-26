@@ -61,6 +61,7 @@ export class UserService {
         lastName: params.lastName ?? user.lastName,
         ci: user.ci,
         phone: params.phone !== undefined ? params.phone : user.phone,
+        isSuperAdmin: user.isSuperAdmin,
       },
       user.id,
     );

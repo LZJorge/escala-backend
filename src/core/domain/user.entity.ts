@@ -7,6 +7,7 @@ export interface UserProps {
   lastName: string;
   ci: string;
   phone: string | null;
+  isSuperAdmin: boolean;
 }
 
 export class User extends Entity<UserProps> {
@@ -32,5 +33,9 @@ export class User extends Entity<UserProps> {
 
   public get phone(): string | null {
     return this.props.phone;
+  }
+
+  public get isSuperAdmin(): boolean {
+    return this.props.isSuperAdmin;
   }
 }

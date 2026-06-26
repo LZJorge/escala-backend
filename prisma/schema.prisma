@@ -67,14 +67,15 @@ enum TranscriptStatus {
 
 /* Stores global identity credentials used for authentication across all tenants before resolving specific institutional permissions */
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  ci           String   @unique 
-  phone        String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  ci            String   @unique 
+  phone         String?
+  isSuperAdmin  Boolean  @default(false) @map("is_super_admin")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   institutionUsers InstitutionUser[]
 

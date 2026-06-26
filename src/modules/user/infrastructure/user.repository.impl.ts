@@ -20,6 +20,7 @@ export class PrismaUserRepository implements UserRepository {
         lastName: record.lastName,
         ci: record.ci,
         phone: record.phone,
+        isSuperAdmin: record.isSuperAdmin,
       },
       record.id,
     );

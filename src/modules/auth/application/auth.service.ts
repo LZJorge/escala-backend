@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { Result } from '@core/domain/result';
 import { AUTH_REPOSITORY } from '../domain/auth.repository';
-import type { AuthRepository } from '../domain/auth.repository';
-import { User } from '@core/domain/user.entity';
+import type {
+  AuthRepository,
+  InstitutionMembership,
+} from '../domain/auth.repository';
 
 @Injectable()
 export class AuthService {
@@ -14,74 +16,17 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  public async register(params: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    ci: string;
-    phone?: string;
-  }): Promise<
-    Result<{
-      accessToken: string;
-      user: { id: string; email: string; firstName: string; lastName: string };
-    }>
-  > {
-    if (
-      !params.email ||
-      !params.password ||
-      !params.firstName ||
-      !params.lastName ||
-      !params.ci
-    ) {
-      return Result.fail('Missing required fields');
-    }
-
-    const existingEmail = await this.authRepository.findByEmail(params.email);
-    if (existingEmail) {
-      return Result.fail('Email already in use');
-    }
-
-    const existingCi = await this.authRepository.findByCi(params.ci);
-    if (existingCi) {
-      return Result.fail('CI already in use');
-    }
-
-    const salt = randomBytes(16).toString('hex');
-    const hashed = scryptSync(params.password, salt, 64).toString('hex');
-    const passwordHash = `${salt}:${hashed}`;
-
-    const user = new User({
-      email: params.email,
-      passwordHash,
-      firstName: params.firstName,
-      lastName: params.lastName,
-      ci: params.ci,
-      phone: params.phone ?? null,
-    });
-
-    await this.authRepository.create(user);
-
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-    });
-
-    return Result.ok({
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-    });
-  }
-
   public async login(params: { email: string; password: string }): Promise<
     Result<{
       accessToken: string;
-      user: { id: string; email: string; firstName: string; lastName: string };
+      user: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        isSuperAdmin: boolean;
+      };
+      institutions: InstitutionMembership[];
     }>
   > {
     if (!params.email || !params.password) {
@@ -104,6 +49,10 @@ export class AuthService {
       return Result.fail('Invalid email or password');
     }
 
+    const institutions = await this.authRepository.findUserInstitutions(
+      user.id,
+    );
+
     const accessToken = this.jwtService.sign({
       sub: user.id,
       email: user.email,
@@ -116,7 +65,9 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        isSuperAdmin: user.isSuperAdmin,
       },
+      institutions,
     });
   }
 }
