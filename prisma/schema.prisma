@@ -5,7 +5,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../prisma/generated/client"
 }
 
 datasource db {
@@ -66,25 +65,30 @@ enum TranscriptStatus {
   WITHDRAWN
 }
 
-/* Stores global identity credentials used for authentication across all tenants before resolving specific institutional permissions */
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  ci           String   @unique 
-  phone        String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String
+  passwordHash  String   @map("password_hash")
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  ci            String
+  phone         String?
+  isSuperAdmin  Boolean  @default(false) @map("is_super_admin")
+  institutionId String?  @map("institution_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
 
+  institution      Institution?      @relation("DirectUserInstitution", fields: [institutionId], references: [id], onDelete: Cascade)
   institutionUsers InstitutionUser[]
 
+  @@unique([institutionId, email])
+  @@unique([institutionId, ci])
   @@map("users")
 }
 
 model Institution {
   id              String          @id @default(uuid()) @db.Uuid
   name            String
+  slug            String          @unique
   institutionType InstitutionType @map("institution_type")
   contactEmail    String          @map("contact_email")
   websiteUrl      String?         @map("website_url")
@@ -92,8 +96,9 @@ model Institution {
   isVerified      Boolean         @default(false) @map("is_verified")
   createdAt       DateTime        @default(now()) @map("created_at")
 
-  users    InstitutionUser[]
-  roles    Role[]
+  userAccounts User[] @relation("DirectUserInstitution")
+  users        InstitutionUser[]
+  roles        Role[]
   programs AcademicProgram[]
   terms    Term[]
 
@@ -109,7 +114,7 @@ model InstitutionUser {
   joinedAt      DateTime @default(now()) @map("joined_at")
 
   user        User                  @relation(fields: [userId], references: [id])
-  institution Institution           @relation(fields: [institutionId], references: [id])
+  institution Institution           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   roles       InstitutionUserRole[]
 
   sectionsTaught        CourseSection[]        @relation("TeacherSections")
@@ -131,7 +136,7 @@ model Role {
   isEditable    Boolean  @default(true) @map("is_editable")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  institution Institution?          @relation(fields: [institutionId], references: [id])
+  institution Institution?          @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   permissions RolePermission[]
   users       InstitutionUserRole[]
 
@@ -182,7 +187,7 @@ model AcademicProgram {
   totalCredits  Int      @map("total_credits")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  institution Institution @relation(fields: [institutionId], references: [id])
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   courses     Course[]
 
   @@map("academic_programs")
@@ -198,7 +203,7 @@ model Course {
   termLevel Int     @map("term_level")
   isActive  Boolean @default(true) @map("is_active")
 
-  program     AcademicProgram @relation(fields: [programId], references: [id])
+  program     AcademicProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
   sections    CourseSection[]
   transcripts Transcript[]
 
@@ -215,7 +220,7 @@ model CoursePrerequisite {
   requiredCourseId String? @map("required_course_id") @db.Uuid
   requiredCredits  Int?    @map("required_credits")
 
-  course         Course  @relation("CoursePrerequisites", fields: [courseId], references: [id])
+  course         Course  @relation("CoursePrerequisites", fields: [courseId], references: [id], onDelete: Cascade)
   requiredCourse Course? @relation("RequiredCourses", fields: [requiredCourseId], references: [id])
 
   @@map("course_prerequisites")
@@ -229,7 +234,7 @@ model Term {
   endDate       DateTime   @map("end_date")
   status        TermStatus @default(UPCOMING)
 
-  institution Institution     @relation(fields: [institutionId], references: [id])
+  institution Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   sections    CourseSection[]
   transcripts Transcript[]
 
@@ -245,9 +250,9 @@ model CourseSection {
   name      String 
   capacity  Int
 
-  course      Course            @relation(fields: [courseId], references: [id])
-  term        Term              @relation(fields: [termId], references: [id])
-  teacher     InstitutionUser   @relation("TeacherSections", fields: [teacherId], references: [id])
+  course      Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  term        Term              @relation(fields: [termId], references: [id], onDelete: Cascade)
+  teacher     InstitutionUser   @relation("TeacherSections", fields: [teacherId], references: [id], onDelete: Cascade)
   schedules   SectionSchedule[]
   enrollments Enrollment[]
   assessments Assessment[]
@@ -277,8 +282,8 @@ model Enrollment {
   status     EnrollmentStatus @default(ENROLLED)
   enrolledAt DateTime         @default(now()) @map("enrolled_at")
 
-  section CourseSection   @relation(fields: [sectionId], references: [id])
-  student InstitutionUser @relation("StudentEnrollments", fields: [studentId], references: [id])
+  section CourseSection   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  student InstitutionUser @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([sectionId, studentId])
   @@map("enrollments")
@@ -294,7 +299,7 @@ model Assessment {
   weightPercentage Decimal        @map("weight_percentage") @db.Decimal(5, 2)
   dueDate          DateTime       @map("due_date")
 
-  section     CourseSection          @relation(fields: [sectionId], references: [id])
+  section     CourseSection          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   submissions AssessmentSubmission[]
 
   @@map("assessments")
@@ -310,8 +315,8 @@ model AssessmentSubmission {
   grade           Decimal? @db.Decimal(4, 2) 
   teacherFeedback String?  @map("teacher_feedback")
 
-  assessment Assessment      @relation(fields: [assessmentId], references: [id])
-  student    InstitutionUser @relation("StudentSubmissions", fields: [studentId], references: [id])
+  assessment Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    InstitutionUser @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([assessmentId, studentId])
   @@map("assessment_submissions")
@@ -327,9 +332,9 @@ model Transcript {
   status     TranscriptStatus
   createdAt  DateTime         @default(now()) @map("created_at")
 
-  student InstitutionUser @relation("StudentTranscripts", fields: [studentId], references: [id])
-  course  Course          @relation(fields: [courseId], references: [id])
-  term    Term            @relation(fields: [termId], references: [id])
+  student InstitutionUser @relation("StudentTranscripts", fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  term    Term            @relation(fields: [termId], references: [id], onDelete: Cascade)
 
   @@map("transcripts")
 }
