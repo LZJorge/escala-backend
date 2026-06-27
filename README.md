@@ -1,98 +1,108 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+<div align="center">
+  <img src="./docs/public/assets/logo.webp" alt="Escala Logo" width="400" />
+</div>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Escala Backend API
+> Enterprise-grade SaaS for Multi-Tenant Academic Administration.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Table of Contents
+- [Escala Backend API](#escala-backend-api)
+  - [Table of Contents](#table-of-contents)
+  - [General Information](#general-information)
+  - [Technologies Used](#technologies-used)
+  - [Features](#features)
+  - [Setup](#setup)
+      - [Testing](#testing)
+  - [Usage](#usage)
+  - [Project Status](#project-status)
+  - [Roadmap](#roadmap)
+  - [Contact](#contact)
 
-## Description
+## General Information
+Escala is a highly scalable, multi-tenant academic management system. It is the completely redesigned, enterprise-ready evolution of my previous MVP, **[AcademyCoreAPI](https://github.com/LZJorge/AcademyCoreAPI)**, which was originally built to manage university operations but paused to re-evaluate its architecture.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+This reborn version leaves behind basic CRUD structures to embrace **Clean Architecture (Hexagonal / Vertical Slicing)**, strict Domain-Driven Design (DDD) principles, and advanced TypeScript configurations. The system is designed to handle the complex operations of modern educational institutions (Universities, Institutes, High Schools) in a B2B SaaS model, ensuring strict data isolation between tenants, granular Role-Based Access Control (RBAC), and mathematical validation for academic schedules and prerequisites.
 
-## Project setup
+The purpose of this project is to showcase advanced backend engineering capabilities, including architectural design, strict type safety, predictable error handling (Result Pattern), and robust database modeling.
 
-```bash
-$ pnpm install
-```
+## Technologies Used
+![NestJS](https://img.shields.io/badge/nestjs-%23E0234E.svg?style=for-the-badge&logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/postgresql-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![Jest](https://img.shields.io/badge/-jest-%23C21325?style=for-the-badge&logo=jest&logoColor=white)
+![Swagger](https://img.shields.io/badge/-Swagger-%23Clojure?style=for-the-badge&logo=swagger&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens)
+![Husky](https://img.shields.io/badge/husky-%23404d59.svg?style=for-the-badge&logo=git&logoColor=white)
 
-## Compile and run the project
+## Features
+- **Strict Multi-Tenancy:** Complete data isolation between educational institutions. Users are uniquely tied to their institution's workspace.
+- **Granular RBAC:** Dynamic permission matrix allowing custom hybrid roles (e.g., an Admin who is also a Teacher) with system-level override flags.
+- **Academic Engine:** Robust handling of academic programs, terms, and complex prerequisite trees (validating both specific courses and global credit thresholds).
+- **Mathematical Schedule Validation:** Schedule collision detection handled mathematically at the database/backend level during enrollment.
+- **Immutable Transcripts:** Precise, decimal-based historical grading records isolated from active enrollments.
+- **Clean Architecture:** Strict separation of Domain, Application, and Infrastructure layers using NestJS strictly as an infrastructure framework.
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Setup
+To set up the local environment, this project uses **Bun** as the primary package manager and runtime.
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# 1. Clone the repository
+git clone [https://github.com/LZJorge/escala-backend.git](https://github.com/LZJorge/escala-backend.git)
+
+# 2. Enter the project directory
+cd escala-backend
+
+# 3. Install dependencies
+bun install
+
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+> **Environment Variables:** You must create a `.env` file from the `.env.example` template at the root of the project. Ensure you provide a valid PostgreSQL `DATABASE_URL`.
 
-## Resources
+```bash
+# 4. Generate the isolated Prisma Client and push the schema
+bunx prisma generate
+bunx prisma db push
 
-Check out a few resources that may come in handy when working with NestJS:
+# 5. Seed the database (Creates global Master and Student roles)
+bun run seed
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# 6. Start the API server in development mode
+bun run start:dev
 
-## Support
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+#### Testing
 
-## Stay in touch
+This project follows Test-Driven Development (TDD) practices.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# Run unit tests
+bun run test
 
-## License
+# Run e2e tests
+bun run test:e2e
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Run test coverage
+bun run test:cov
+
+```
+
+## Usage
+
+The API endpoints are documented using Swagger. Once the server is running, navigate to the configured API documentation route (usually `/api/docs` or `/swagger`) to explore and test the available RESTful routes.
+
+## Project Status
+
+Project is: *In Progress*
+
+## Roadmap
+
+Upcoming features and infrastructural improvements:
+
+* **Redis Integration:** Caching the RBAC permission matrix for extreme endpoint performance.
+* **RabbitMQ Implementation:** Asynchronous processing for heavy tasks (e.g., closing an academic term and calculating thousands of final transcripts).
+* **AWS S3 Integration:** Offloading static assets (Institution logos, student assignments) to cloud storage.
+* **Grafana & Prometheus:** Adding system observability and metrics monitoring.

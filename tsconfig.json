@@ -22,10 +22,11 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
     "strictBindCallApply": true,
+    "strictPropertyInitialization": false,
     "noFallthroughCasesInSwitch": false,
     "types": ["jest", "node"],
     "paths": {
-      "@prisma/*": ["./prisma/generated/*"],
+      "@prisma/generated/*": ["./prisma/generated/*"],
       "@core/*": ["./src/core/*"],
       "@modules/*": ["./src/modules/*"]
     }
