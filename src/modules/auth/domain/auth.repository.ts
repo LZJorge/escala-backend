@@ -7,9 +7,13 @@ export interface InstitutionMembership {
   institutionId: string;
   institutionName: string;
   institutionType: string;
+  institutionUserId?: string;
 }
 
 export interface AuthRepository {
   findByEmail(email: string, institutionId?: string): Promise<User | null>;
-  findInstitutionById(id: string): Promise<InstitutionMembership | null>;
+  findInstitutionById(
+    id: string,
+    userId?: string,
+  ): Promise<InstitutionMembership | null>;
 }

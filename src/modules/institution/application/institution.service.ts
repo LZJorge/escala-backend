@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { InstitutionType, PrismaClient } from '@prisma/client';
+import { Prisma, type InstitutionType } from '@prisma/client';
 import { randomBytes, scryptSync, randomUUID } from 'node:crypto';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { Result } from '@core/domain/result';
@@ -72,7 +72,7 @@ export class InstitutionService {
 
     let institutionId = '';
 
-    await this.prisma.$transaction(async (tx: PrismaClient) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       institutionId = randomUUID();
       const institution = await tx.institution.create({
         data: {
@@ -233,24 +233,40 @@ export class InstitutionService {
       institutionId,
     });
 
-    const iu = await this.prisma.$transaction(async (tx: PrismaClient) => {
-      await tx.user.create({
-        data: {
-          id: user.id,
-          email: user.email,
-          passwordHash: user.passwordHash,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          ci: user.ci,
-          phone: user.phone,
-          isSuperAdmin: false,
-          institutionId,
-        },
-      });
-      return tx.institutionUser.create({
-        data: { userId: user.id, institutionId },
-      });
-    });
+    const iu = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await tx.user.create({
+          data: {
+            id: user.id,
+            email: user.email,
+            passwordHash: user.passwordHash,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            ci: user.ci,
+            phone: user.phone,
+            isSuperAdmin: false,
+            institutionId,
+          },
+        });
+        const institutionUser = await tx.institutionUser.create({
+          data: { userId: user.id, institutionId },
+        });
+
+        const studentRole = await tx.role.findFirst({
+          where: { institutionId, isStudent: true },
+        });
+        if (studentRole) {
+          await tx.institutionUserRole.create({
+            data: {
+              institutionUserId: institutionUser.id,
+              roleId: studentRole.id,
+            },
+          });
+        }
+
+        return institutionUser;
+      },
+    );
 
     return Result.ok({
       id: user.id,

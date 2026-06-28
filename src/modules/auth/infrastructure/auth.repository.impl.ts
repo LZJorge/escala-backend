@@ -37,6 +37,7 @@ export class PrismaAuthRepository implements AuthRepository {
 
   public async findInstitutionById(
     id: string,
+    userId?: string,
   ): Promise<InstitutionMembership | null> {
     const record = await this.prisma.institution.findUnique({
       where: { id },
@@ -44,11 +45,22 @@ export class PrismaAuthRepository implements AuthRepository {
     if (!record) {
       return null;
     }
+
+    let institutionUserId: string | undefined;
+    if (userId) {
+      const iu = await this.prisma.institutionUser.findFirst({
+        where: { userId, institutionId: id },
+        select: { id: true },
+      });
+      institutionUserId = iu?.id;
+    }
+
     return {
       id: record.id,
       institutionId: record.id,
       institutionName: record.name,
       institutionType: record.institutionType,
+      institutionUserId,
     };
   }
 }

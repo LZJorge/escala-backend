@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { Result } from '@core/domain/result';
+import { PrismaService } from '@core/infrastructure/database/prisma.service';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { AUTH_REPOSITORY } from '../domain/auth.repository';
 import type {
   AuthRepository,
@@ -14,6 +16,8 @@ export class AuthService {
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
   ) {}
 
   public async login(params: {
@@ -49,12 +53,6 @@ export class AuthService {
       if (user.institutionId !== params.institutionId) {
         return Result.fail('Invalid email or password');
       }
-      const institution = await this.authRepository.findInstitutionById(
-        params.institutionId,
-      );
-      if (!institution) {
-        return Result.fail('Institution not found');
-      }
     }
 
     const [salt, storedHash] = user.passwordHash.split(':');
@@ -70,14 +68,30 @@ export class AuthService {
 
     const institution =
       user.institutionId !== null
-        ? await this.authRepository.findInstitutionById(user.institutionId)
+        ? await this.authRepository.findInstitutionById(
+            user.institutionId,
+            user.id,
+          )
         : null;
 
-    const accessToken = this.jwtService.sign({
+    const jwtPayload: Record<string, unknown> = {
       sub: user.id,
       email: user.email,
       isSuperAdmin: user.isSuperAdmin,
-    });
+    };
+
+    if (institution) {
+      jwtPayload.institutionId = institution.institutionId;
+      if (institution.institutionUserId) {
+        jwtPayload.institutionUserId = institution.institutionUserId;
+      }
+    }
+
+    const accessToken = this.jwtService.sign(jwtPayload);
+
+    if (institution && institution.institutionUserId) {
+      await this.warmCache(user.id, institution.institutionId);
+    }
 
     return Result.ok({
       accessToken,
@@ -90,5 +104,74 @@ export class AuthService {
       },
       institution,
     });
+  }
+
+  private async warmCache(
+    userId: string,
+    institutionId: string,
+  ): Promise<void> {
+    const membership = await this.prisma.institutionUser.findFirst({
+      where: { userId, institutionId, isActive: true },
+      select: {
+        roles: {
+          select: {
+            roleId: true,
+            role: {
+              select: {
+                isMaster: true,
+                permissions: {
+                  select: { permission: { select: { code: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return;
+    }
+
+    const isMaster = membership.roles.some(
+      (r: { role: { isMaster: boolean } }) => r.role.isMaster,
+    );
+    const roleIds: string[] = [];
+    const permsByRole: Map<string, string[]> = new Map();
+
+    for (const iur of membership.roles) {
+      roleIds.push(iur.roleId);
+      const codes = iur.role.permissions.map(
+        (rp: { permission: { code: string } }) => rp.permission.code,
+      );
+      permsByRole.set(iur.roleId, codes);
+    }
+
+    const pipeline = this.redis.pipeline();
+
+    pipeline.set(
+      `user:${userId}:tenant:${institutionId}:master`,
+      isMaster ? '1' : '0',
+      'EX',
+      3600,
+    );
+
+    const rolesKey = `user:${userId}:tenant:${institutionId}:roles`;
+    pipeline.del(rolesKey);
+    if (roleIds.length > 0) {
+      pipeline.sadd(rolesKey, ...roleIds);
+      pipeline.expire(rolesKey, 3600);
+    }
+
+    for (const [roleId, codes] of permsByRole) {
+      const permsKey = `tenant:${institutionId}:role:${roleId}:permissions`;
+      pipeline.del(permsKey);
+      if (codes.length > 0) {
+        pipeline.sadd(permsKey, ...codes);
+        pipeline.expire(permsKey, 3600);
+      }
+    }
+
+    await pipeline.exec();
   }
 }

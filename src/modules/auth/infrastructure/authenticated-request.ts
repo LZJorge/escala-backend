@@ -5,5 +5,7 @@ export interface AuthenticatedRequest extends Request {
     sub: string;
     email: string;
     isSuperAdmin: boolean;
+    institutionId?: string;
+    institutionUserId?: string;
   };
 }
