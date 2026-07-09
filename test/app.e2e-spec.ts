@@ -1,25 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '@core/infrastructure/database/prisma.service';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { PrismaServiceMock } from './utils/mocks/prisma.mock';
+import { RedisServiceMock } from './utils/mocks/redis.mock';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+describe('App (smoke)', () => {
+  let app: INestApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(new PrismaServiceMock())
+      .overrideProvider(RedisService)
+      .useValue(new RedisServiceMock())
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('boots without error', () => {
+    expect(app).toBeDefined();
+  });
+
+  it('responds 404 on unknown route', () => {
+    return request(app.getHttpServer()).get('/unknown-route').expect(404);
   });
 });
