@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from '@core/infrastructure/database/prisma.module';
 import { RedisModule } from '@core/infrastructure/cache/redis.module';
 import { AuthModule } from '@modules/auth/infrastructure/auth.module';
@@ -9,6 +9,7 @@ import { PermissionModule } from '@modules/permission/infrastructure/permission.
 import { RoleModule } from '@modules/role/infrastructure/role.module';
 import { ProgramModule } from '@modules/program/infrastructure/program.module';
 import { ExceptionFilter } from '@core/infrastructure/http/exception.filter';
+import { TransformInterceptor } from '@core/infrastructure/http/transform.interceptor';
 
 @Module({
   imports: [
@@ -26,6 +27,10 @@ import { ExceptionFilter } from '@core/infrastructure/http/exception.filter';
     {
       provide: APP_FILTER,
       useClass: ExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
     },
   ],
 })

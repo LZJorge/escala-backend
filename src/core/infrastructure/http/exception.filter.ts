@@ -7,6 +7,19 @@ import {
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
 
+const ERROR_CODE_MAP: Record<number, string> = {
+  400: 'BAD_REQUEST',
+  401: 'UNAUTHORIZED',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  409: 'CONFLICT',
+  422: 'UNPROCESSABLE_ENTITY',
+  429: 'TOO_MANY_REQUESTS',
+  500: 'INTERNAL_SERVER_ERROR',
+  502: 'BAD_GATEWAY',
+  503: 'SERVICE_UNAVAILABLE',
+};
+
 @Catch()
 export class ExceptionFilter implements NestExceptionFilter {
   public catch(exception: unknown, host: ArgumentsHost): void {
@@ -24,33 +37,33 @@ export class ExceptionFilter implements NestExceptionFilter {
         ? exception.getResponse()
         : { message: 'Internal server error' };
 
-    const message =
-      typeof exceptionResponse === 'string'
-        ? exceptionResponse
-        : typeof (exceptionResponse as Record<string, unknown>).message ===
-            'string'
-          ? ((exceptionResponse as Record<string, unknown>).message as string)
-          : Array.isArray(
-                (exceptionResponse as Record<string, unknown>).message,
-              )
-            ? (
-                (exceptionResponse as Record<string, unknown>)
-                  .message as string[]
-              ).join(', ')
-            : 'Internal server error';
+    let message: string;
+    let details: string[] | undefined;
 
-    const errorLabel =
-      typeof exceptionResponse === 'object' &&
-      (exceptionResponse as Record<string, unknown>).error
-        ? ((exceptionResponse as Record<string, unknown>).error as string)
-        : undefined;
+    if (typeof exceptionResponse === 'string') {
+      message = exceptionResponse;
+    } else {
+      const body = exceptionResponse as Record<string, unknown>;
+      if (typeof body.message === 'string') {
+        message = body.message;
+      } else if (Array.isArray(body.message)) {
+        message = (body.message as string[]).join(', ');
+        details = body.message as string[];
+      } else {
+        message = 'Internal server error';
+      }
+    }
+
+    const code = ERROR_CODE_MAP[status] ?? 'INTERNAL_SERVER_ERROR';
+
+    void request;
 
     response.status(status).json({
-      statusCode: status,
-      message,
-      ...(errorLabel ? { error: errorLabel } : {}),
-      timestamp: new Date().toISOString(),
-      path: request.path,
+      error: {
+        code,
+        message,
+        ...(details ? { details } : {}),
+      },
     });
   }
 }
