@@ -31,17 +31,20 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
 
     if (user.isSuperAdmin) {
+      const allReadOnly = required.every(
+        (p: string) => p.endsWith('.read') || p === 'transcript.export',
+      );
+      if (!allReadOnly) {
+        throw new ForbiddenException(
+          'Super admins are read-only on institution resources',
+        );
+      }
       return true;
     }
 
     const institutionId = this.resolveInstitutionId(request);
     if (!institutionId) {
       throw new ForbiddenException('Institution context required');
-    }
-
-    const isMaster = await this.checkMaster(user.sub, institutionId);
-    if (isMaster) {
-      return true;
     }
 
     const permissions = await this.effectivePermissions(
@@ -65,30 +68,6 @@ export class PermissionsGuard implements CanActivate {
         | undefined) ??
       null
     );
-  }
-
-  private async checkMaster(
-    userId: string,
-    institutionId: string,
-  ): Promise<boolean> {
-    const cacheKey = `user:${userId}:tenant:${institutionId}:master`;
-    const cached = await this.redis.get(cacheKey);
-    if (cached !== null) {
-      return cached === '1';
-    }
-
-    const membership = await this.prisma.institutionUser.findFirst({
-      where: {
-        userId,
-        institutionId,
-        isActive: true,
-        roles: { some: { role: { isMaster: true } } },
-      },
-    });
-
-    const isMaster = membership !== null;
-    await this.redis.set(cacheKey, isMaster ? '1' : '0', 'EX', 3600);
-    return isMaster;
   }
 
   private async effectivePermissions(

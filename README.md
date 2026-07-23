@@ -39,7 +39,7 @@ The purpose of this project is to showcase advanced backend engineering capabili
 ## Features
 - **Strict Multi-Tenancy:** Complete data isolation between educational institutions. Users are uniquely tied to their institution's workspace.
 - **Granular RBAC:** Dynamic permission matrix allowing custom hybrid roles (e.g., an Admin who is also a Teacher) with system-level override flags.
-- **Academic Engine:** Robust handling of academic programs, terms, and complex prerequisite trees (validating both specific courses and global credit thresholds).
+- **Academic Engine:** Robust handling of programs (degree plans), terms, and complex prerequisite trees (validating both specific courses and global credit thresholds).
 - **Mathematical Schedule Validation:** Schedule collision detection handled mathematically at the database/backend level during enrollment.
 - **Immutable Transcripts:** Precise, decimal-based historical grading records isolated from active enrollments.
 - **Clean Architecture:** Strict separation of Domain, Application, and Infrastructure layers using NestJS strictly as an infrastructure framework.

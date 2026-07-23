@@ -7,6 +7,7 @@ import { UserModule } from '@modules/user/infrastructure/user.module';
 import { InstitutionModule } from '@modules/institution/infrastructure/institution.module';
 import { PermissionModule } from '@modules/permission/infrastructure/permission.module';
 import { RoleModule } from '@modules/role/infrastructure/role.module';
+import { ProgramModule } from '@modules/program/infrastructure/program.module';
 import { ExceptionFilter } from '@core/infrastructure/http/exception.filter';
 
 @Module({
@@ -18,6 +19,7 @@ import { ExceptionFilter } from '@core/infrastructure/http/exception.filter';
     InstitutionModule,
     PermissionModule,
     RoleModule,
+    ProgramModule,
   ],
   controllers: [],
   providers: [
