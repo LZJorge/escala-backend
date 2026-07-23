@@ -202,7 +202,6 @@ export class RoleService {
     return Result.ok(undefined);
   }
 
-  // ponytail: assignRole/unassignedRole — legacy, needs user module migration
   public async assignRole(
     userId: string,
     roleId: string,
