@@ -1,14 +1,10 @@
 import { Entity } from '@core/domain/entity.base';
-import type { InstitutionType } from '@prisma/client';
 
 export interface InstitutionProps {
   name: string;
-  slug: string;
-  institutionType: InstitutionType;
-  contactEmail: string;
+  contactEmail: string | null;
   websiteUrl: string | null;
   logoUrl: string | null;
-  isVerified: boolean;
 }
 
 export class Institution extends Entity<InstitutionProps> {
@@ -16,15 +12,7 @@ export class Institution extends Entity<InstitutionProps> {
     return this.props.name;
   }
 
-  public get slug(): string {
-    return this.props.slug;
-  }
-
-  public get institutionType(): InstitutionType {
-    return this.props.institutionType;
-  }
-
-  public get contactEmail(): string {
+  public get contactEmail(): string | null {
     return this.props.contactEmail;
   }
 
@@ -34,9 +22,5 @@ export class Institution extends Entity<InstitutionProps> {
 
   public get logoUrl(): string | null {
     return this.props.logoUrl;
-  }
-
-  public get isVerified(): boolean {
-    return this.props.isVerified;
   }
 }

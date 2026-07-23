@@ -19,11 +19,11 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Authenticate user and return JWT with institution',
+    summary: 'Authenticate user and return JWT',
   })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
-    description: 'Token + user profile + institution (null for super admin)',
+    description: 'Token + user profile',
   })
   @ApiErrors(401)
   public async login(@Body() body: LoginDto): Promise<{
@@ -33,14 +33,8 @@ export class AuthController {
       email: string;
       firstName: string;
       lastName: string;
-      isSuperAdmin: boolean;
+      roleType: 'SUPER_ADMIN' | 'USER';
     };
-    institution: {
-      id: string;
-      institutionId: string;
-      institutionName: string;
-      institutionType: string;
-    } | null;
   }> {
     const result = await this.authService.login(body);
     if (result.isFailure) {

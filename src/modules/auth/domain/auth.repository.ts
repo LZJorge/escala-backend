@@ -2,18 +2,13 @@ import { User } from '@core/domain/user.entity';
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
 
-export interface InstitutionMembership {
+export interface SuperAdminRecord {
   id: string;
-  institutionId: string;
-  institutionName: string;
-  institutionType: string;
-  institutionUserId?: string;
+  email: string;
+  password: string;
 }
 
 export interface AuthRepository {
-  findByEmail(email: string, institutionId?: string): Promise<User | null>;
-  findInstitutionById(
-    id: string,
-    userId?: string,
-  ): Promise<InstitutionMembership | null>;
+  findByEmail(email: string): Promise<User | null>;
+  findSuperAdminByEmail(email: string): Promise<SuperAdminRecord | null>;
 }

@@ -4,8 +4,6 @@ export interface AuthenticatedRequest extends Request {
   user: {
     sub: string;
     email: string;
-    isSuperAdmin: boolean;
-    institutionId?: string;
-    institutionUserId?: string;
+    roleType: 'SUPER_ADMIN' | 'USER';
   };
 }

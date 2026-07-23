@@ -49,9 +49,6 @@ export class ProgramResponseDto {
   public id: string;
 
   @ApiProperty()
-  public institutionId: string;
-
-  @ApiProperty()
   public name: string;
 
   @ApiProperty({ enum: ['SEMESTER', 'QUARTER', 'YEAR'] })

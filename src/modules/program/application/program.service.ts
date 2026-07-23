@@ -12,17 +12,13 @@ export class ProgramService {
     private readonly repository: ProgramRepository,
   ) {}
 
-  public async create(
-    institutionId: string,
-    params: {
-      name: string;
-      termType: TermType;
-      totalCredits: number;
-    },
-  ): Promise<
+  public async create(params: {
+    name: string;
+    termType: TermType;
+    totalCredits: number;
+  }): Promise<
     Result<{
       id: string;
-      institutionId: string;
       name: string;
       termType: string;
       totalCredits: number;
@@ -30,7 +26,6 @@ export class ProgramService {
     }>
   > {
     const program = new Program({
-      institutionId,
       name: params.name,
       termType: params.termType,
       totalCredits: params.totalCredits,
@@ -40,7 +35,6 @@ export class ProgramService {
 
     return Result.ok({
       id: saved.id,
-      institutionId: saved.institutionId,
       name: saved.name,
       termType: saved.termType,
       totalCredits: saved.totalCredits,
@@ -48,11 +42,10 @@ export class ProgramService {
     });
   }
 
-  public async findAll(institutionId: string): Promise<
+  public async findAll(): Promise<
     Result<
       Array<{
         id: string;
-        institutionId: string;
         name: string;
         termType: string;
         totalCredits: number;
@@ -60,12 +53,11 @@ export class ProgramService {
       }>
     >
   > {
-    const programs = await this.repository.findAll(institutionId);
+    const programs = await this.repository.findAll();
 
     return Result.ok(
       programs.map((p: Program) => ({
         id: p.id,
-        institutionId: p.institutionId,
         name: p.name,
         termType: p.termType,
         totalCredits: p.totalCredits,
@@ -77,7 +69,6 @@ export class ProgramService {
   public async findById(id: string): Promise<
     Result<{
       id: string;
-      institutionId: string;
       name: string;
       termType: string;
       totalCredits: number;
@@ -92,7 +83,6 @@ export class ProgramService {
 
     return Result.ok({
       id: program.id,
-      institutionId: program.institutionId,
       name: program.name,
       termType: program.termType,
       totalCredits: program.totalCredits,
@@ -110,7 +100,6 @@ export class ProgramService {
   ): Promise<
     Result<{
       id: string;
-      institutionId: string;
       name: string;
       termType: string;
       totalCredits: number;
@@ -125,7 +114,6 @@ export class ProgramService {
 
     const updated = new Program(
       {
-        institutionId: existing.institutionId,
         name: params.name ?? existing.name,
         termType: params.termType ?? existing.termType,
         totalCredits: params.totalCredits ?? existing.totalCredits,
@@ -137,7 +125,6 @@ export class ProgramService {
 
     return Result.ok({
       id: saved.id,
-      institutionId: saved.institutionId,
       name: saved.name,
       termType: saved.termType,
       totalCredits: saved.totalCredits,
@@ -152,7 +139,7 @@ export class ProgramService {
       return Result.fail('Program not found');
     }
 
-    await this.repository.delete(id);
+    await this.repository.softDelete(id);
 
     return Result.ok(undefined);
   }

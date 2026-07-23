@@ -2,13 +2,11 @@ import { Entity } from './entity.base';
 
 export interface UserProps {
   email: string;
-  passwordHash: string;
+  password: string;
   firstName: string;
   lastName: string;
   ci: string;
   phone: string | null;
-  isSuperAdmin: boolean;
-  institutionId: string | null;
 }
 
 export class User extends Entity<UserProps> {
@@ -16,8 +14,8 @@ export class User extends Entity<UserProps> {
     return this.props.email;
   }
 
-  public get passwordHash(): string {
-    return this.props.passwordHash;
+  public get password(): string {
+    return this.props.password;
   }
 
   public get firstName(): string {
@@ -34,13 +32,5 @@ export class User extends Entity<UserProps> {
 
   public get phone(): string | null {
     return this.props.phone;
-  }
-
-  public get isSuperAdmin(): boolean {
-    return this.props.isSuperAdmin;
-  }
-
-  public get institutionId(): string | null {
-    return this.props.institutionId;
   }
 }

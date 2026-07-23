@@ -13,7 +13,6 @@ export class PrismaProgramRepository implements ProgramRepository {
     const record = await this.prisma.program.create({
       data: {
         id: program.id,
-        institutionId: program.institutionId,
         name: program.name,
         termType: program.termType,
         totalCredits: program.totalCredits,
@@ -23,9 +22,9 @@ export class PrismaProgramRepository implements ProgramRepository {
     return this.toEntity(record);
   }
 
-  public async findAll(institutionId: string): Promise<Program[]> {
+  public async findAll(): Promise<Program[]> {
     const records = await this.prisma.program.findMany({
-      where: { institutionId },
+      where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -34,7 +33,7 @@ export class PrismaProgramRepository implements ProgramRepository {
 
   public async findById(id: string): Promise<Program | null> {
     const record = await this.prisma.program.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
     });
 
     if (!record) {
@@ -57,19 +56,16 @@ export class PrismaProgramRepository implements ProgramRepository {
     return this.toEntity(record);
   }
 
-  public async delete(id: string): Promise<boolean> {
-    try {
-      await this.prisma.program.delete({ where: { id } });
-      return true;
-    } catch {
-      return false;
-    }
+  public async softDelete(id: string): Promise<void> {
+    await this.prisma.program.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   private toEntity(record: PrismaProgram): Program {
     return new Program(
       {
-        institutionId: record.institutionId,
         name: record.name,
         termType: record.termType,
         totalCredits: record.totalCredits,

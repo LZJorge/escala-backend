@@ -22,7 +22,7 @@ export class JwtAuthGuard implements CanActivate {
       const payload = this.jwtService.verify<{
         sub: string;
         email: string;
-        isSuperAdmin: boolean;
+        roleType: 'SUPER_ADMIN' | 'USER';
       }>(token);
       request.user = payload;
       return true;

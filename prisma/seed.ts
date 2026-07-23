@@ -47,7 +47,7 @@ const PERMISSIONS: Array<{ code: string; module: string; description: string }> 
 ];
 
 async function seed(): Promise<void> {
-  console.log('Seeding permissions…');
+  console.log('Seeding permissions...');
 
   for (const perm of PERMISSIONS) {
     await prisma.permission.upsert({
@@ -57,30 +57,43 @@ async function seed(): Promise<void> {
     });
   }
 
-  console.log(`✅ ${PERMISSIONS.length} permissions seeded.`);
+  console.log(`Seeded ${PERMISSIONS.length} permissions.`);
 
-  const superAdminEmail = 'admin@escala.app';
-  const existing = await prisma.user.findFirst({
-    where: { email: superAdminEmail, institutionId: null },
-  });
+  const superAdminEmail = process.env.SUPERADMIN_EMAIL;
+  const superAdminPassword = process.env.SUPERADMIN_PASSWORD;
 
-  if (!existing) {
-    const salt = randomBytes(16).toString('hex');
-    const hashed = scryptSync('admin123', salt, 64).toString('hex');
+  if (!superAdminEmail || !superAdminPassword) {
+    console.warn('Missing SUPERADMIN_EMAIL or SUPERADMIN_PASSWORD in environment. Skipping super admin creation.');
+  } else {
+    const existing = await prisma.superAdmin.findFirst();;
 
-    await prisma.user.create({
+    if (!existing) {
+      const salt = randomBytes(16).toString('hex');
+      const hashed = scryptSync(superAdminPassword, salt, 64).toString('hex');
+
+      await prisma.superAdmin.create({
+        data: {
+          email: superAdminEmail,
+          password: `${salt}:${hashed}`,
+        },
+      });
+      console.log(`Super admin created`);
+    } else {
+      console.log('Super admin already exists. Skipping.');
+    }
+  }
+
+  const institutionCount = await prisma.institution.count();
+  if (institutionCount === 0) {
+    await prisma.institution.create({
       data: {
-        email: superAdminEmail,
-        passwordHash: `${salt}:${hashed}`,
-        firstName: 'Super',
-        lastName: 'Admin',
-        ci: '00000000',
-        isSuperAdmin: true,
+        name: 'Default Institution',
+        contactEmail: 'admin@institution.edu',
       },
     });
-    console.log('✅ Super admin user created (admin@escala.app / admin123).');
+    console.log('Default institution created.');
   } else {
-    console.log('⏭️  Super admin already exists — skipped.');
+    console.log('Institution already exists. Skipping.');
   }
 
   await prisma.$disconnect();

@@ -40,35 +40,8 @@ export class RoleResponseDto {
   public readonly isStudent: boolean;
 
   @ApiProperty()
-  public readonly isMaster: boolean;
-
-  @ApiProperty()
   public readonly isEditable: boolean;
 
   @ApiProperty({ type: [String] })
   public readonly permissionCodes: string[];
-}
-
-export class AssignRoleDto {
-  @ApiProperty({ description: 'InstitutionUser ID' })
-  @IsString()
-  @IsNotEmpty()
-  public readonly institutionUserId: string;
-
-  @ApiProperty({ description: 'Role ID' })
-  @IsString()
-  @IsNotEmpty()
-  public readonly roleId: string;
-}
-
-export class UnassignRoleDto {
-  @ApiProperty({ description: 'InstitutionUser ID' })
-  @IsString()
-  @IsNotEmpty()
-  public readonly institutionUserId: string;
-
-  @ApiProperty({ description: 'Role ID' })
-  @IsString()
-  @IsNotEmpty()
-  public readonly roleId: string;
 }

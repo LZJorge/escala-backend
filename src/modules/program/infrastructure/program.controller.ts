@@ -25,7 +25,7 @@ import {
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 
 @ApiTags('Programs')
-@Controller('institutions/:institutionId/programs')
+@Controller('programs')
 export class ProgramController {
   constructor(private readonly service: ProgramService) {}
 
@@ -35,10 +35,9 @@ export class ProgramController {
   @ApiCreatedResponse({ type: ProgramResponseDto })
   @ApiErrors(401, 403, 422)
   public async create(
-    @Param('institutionId') institutionId: string,
     @Body() body: CreateProgramDto,
   ): Promise<ProgramResponseDto> {
-    const result = await this.service.create(institutionId, body);
+    const result = await this.service.create(body);
 
     if (result.isFailure) {
       throw new UnprocessableEntityException(result.error);
@@ -49,12 +48,10 @@ export class ProgramController {
 
   @Get()
   @RequirePermission('program.read')
-  @ApiOperation({ summary: 'List all programs for an institution' })
+  @ApiOperation({ summary: 'List all programs' })
   @ApiOkResponse({ type: [ProgramResponseDto] })
-  public async findAll(
-    @Param('institutionId') institutionId: string,
-  ): Promise<ProgramResponseDto[]> {
-    const result = await this.service.findAll(institutionId);
+  public async findAll(): Promise<ProgramResponseDto[]> {
+    const result = await this.service.findAll();
 
     return result.value;
   }
@@ -96,14 +93,14 @@ export class ProgramController {
 
   @Delete(':programId')
   @RequirePermission('program.delete')
-  @ApiOperation({ summary: 'Delete a program' })
+  @ApiOperation({ summary: 'Soft delete a program' })
   @ApiOkResponse({ description: 'Program deleted' })
   @ApiErrors(401, 403, 404, 422)
   public async delete(@Param('programId') programId: string): Promise<void> {
     const result = await this.service.delete(programId);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new NotFoundException(result.error);
     }
   }
 }
