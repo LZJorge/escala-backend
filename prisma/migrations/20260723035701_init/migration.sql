@@ -1,7 +1,4 @@
 -- CreateEnum
-CREATE TYPE "InstitutionType" AS ENUM ('UNIVERSITY', 'HIGH_SCHOOL', 'INSTITUTE');
-
--- CreateEnum
 CREATE TYPE "TermType" AS ENUM ('SEMESTER', 'QUARTER', 'YEAR');
 
 -- CreateEnum
@@ -23,51 +20,48 @@ CREATE TYPE "FileType" AS ENUM ('PDF', 'DOCX', 'TXT', 'IMAGE');
 CREATE TYPE "TranscriptStatus" AS ENUM ('PASSED', 'FAILED', 'WITHDRAWN');
 
 -- CreateTable
-CREATE TABLE "users" (
-    "id" UUID NOT NULL,
-    "email" TEXT NOT NULL,
-    "password_hash" TEXT NOT NULL,
-    "first_name" TEXT NOT NULL,
-    "last_name" TEXT NOT NULL,
-    "ci" TEXT NOT NULL,
-    "phone" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "institutions" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
-    "institution_type" "InstitutionType" NOT NULL,
-    "contact_email" TEXT NOT NULL,
+    "contact_email" TEXT,
     "website_url" TEXT,
     "logo_url" TEXT,
-    "is_verified" BOOLEAN NOT NULL DEFAULT false,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "institutions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "institution_users" (
+CREATE TABLE "users" (
     "id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
-    "institution_id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "first_name" TEXT NOT NULL,
+    "last_name" TEXT NOT NULL,
+    "ci" TEXT NOT NULL,
+    "phone" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "joined_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" TIMESTAMP(3),
 
-    CONSTRAINT "institution_users_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "super_admins" (
+    "id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "super_admins_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "roles" (
     "id" UUID NOT NULL,
-    "institution_id" UUID,
     "name" TEXT NOT NULL,
     "is_student" BOOLEAN NOT NULL DEFAULT false,
-    "is_master" BOOLEAN NOT NULL DEFAULT false,
     "is_editable" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -94,24 +88,24 @@ CREATE TABLE "role_permissions" (
 );
 
 -- CreateTable
-CREATE TABLE "institution_user_roles" (
+CREATE TABLE "user_roles" (
     "id" UUID NOT NULL,
-    "institution_user_id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
     "role_id" UUID NOT NULL,
 
-    CONSTRAINT "institution_user_roles_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "user_roles_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "academic_programs" (
+CREATE TABLE "programs" (
     "id" UUID NOT NULL,
-    "institution_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "term_type" "TermType" NOT NULL,
     "total_credits" INTEGER NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted_at" TIMESTAMP(3),
 
-    CONSTRAINT "academic_programs_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "programs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -123,6 +117,7 @@ CREATE TABLE "courses" (
     "credits" INTEGER NOT NULL,
     "term_level" INTEGER NOT NULL,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "deleted_at" TIMESTAMP(3),
 
     CONSTRAINT "courses_pkey" PRIMARY KEY ("id")
 );
@@ -140,11 +135,11 @@ CREATE TABLE "course_prerequisites" (
 -- CreateTable
 CREATE TABLE "terms" (
     "id" UUID NOT NULL,
-    "institution_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "start_date" TIMESTAMP(3) NOT NULL,
     "end_date" TIMESTAMP(3) NOT NULL,
     "status" "TermStatus" NOT NULL DEFAULT 'UPCOMING',
+    "deleted_at" TIMESTAMP(3),
 
     CONSTRAINT "terms_pkey" PRIMARY KEY ("id")
 );
@@ -157,6 +152,7 @@ CREATE TABLE "course_sections" (
     "teacher_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "capacity" INTEGER NOT NULL,
+    "deleted_at" TIMESTAMP(3),
 
     CONSTRAINT "course_sections_pkey" PRIMARY KEY ("id")
 );
@@ -231,7 +227,7 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_ci_key" ON "users"("ci");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "institution_users_user_id_institution_id_key" ON "institution_users"("user_id", "institution_id");
+CREATE UNIQUE INDEX "super_admins_email_key" ON "super_admins"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "permissions_code_key" ON "permissions"("code");
@@ -240,7 +236,7 @@ CREATE UNIQUE INDEX "permissions_code_key" ON "permissions"("code");
 CREATE UNIQUE INDEX "role_permissions_role_id_permission_id_key" ON "role_permissions"("role_id", "permission_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "institution_user_roles_institution_user_id_role_id_key" ON "institution_user_roles"("institution_user_id", "role_id");
+CREATE UNIQUE INDEX "user_roles_user_id_role_id_key" ON "user_roles"("user_id", "role_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "enrollments_section_id_student_id_key" ON "enrollments"("section_id", "student_id");
@@ -249,73 +245,58 @@ CREATE UNIQUE INDEX "enrollments_section_id_student_id_key" ON "enrollments"("se
 CREATE UNIQUE INDEX "assessment_submissions_assessment_id_student_id_key" ON "assessment_submissions"("assessment_id", "student_id");
 
 -- AddForeignKey
-ALTER TABLE "institution_users" ADD CONSTRAINT "institution_users_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "institution_users" ADD CONSTRAINT "institution_users_institution_id_fkey" FOREIGN KEY ("institution_id") REFERENCES "institutions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "roles" ADD CONSTRAINT "roles_institution_id_fkey" FOREIGN KEY ("institution_id") REFERENCES "institutions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_fkey" FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "institution_user_roles" ADD CONSTRAINT "institution_user_roles_institution_user_id_fkey" FOREIGN KEY ("institution_user_id") REFERENCES "institution_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "institution_user_roles" ADD CONSTRAINT "institution_user_roles_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "academic_programs" ADD CONSTRAINT "academic_programs_institution_id_fkey" FOREIGN KEY ("institution_id") REFERENCES "institutions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "courses" ADD CONSTRAINT "courses_program_id_fkey" FOREIGN KEY ("program_id") REFERENCES "programs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "courses" ADD CONSTRAINT "courses_program_id_fkey" FOREIGN KEY ("program_id") REFERENCES "academic_programs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "course_prerequisites" ADD CONSTRAINT "course_prerequisites_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "course_prerequisites" ADD CONSTRAINT "course_prerequisites_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "course_prerequisites" ADD CONSTRAINT "course_prerequisites_required_course_id_fkey" FOREIGN KEY ("required_course_id") REFERENCES "courses"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "terms" ADD CONSTRAINT "terms_institution_id_fkey" FOREIGN KEY ("institution_id") REFERENCES "institutions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_term_id_fkey" FOREIGN KEY ("term_id") REFERENCES "terms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_term_id_fkey" FOREIGN KEY ("term_id") REFERENCES "terms"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "institution_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "course_sections" ADD CONSTRAINT "course_sections_teacher_id_fkey" FOREIGN KEY ("teacher_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "section_schedules" ADD CONSTRAINT "section_schedules_section_id_fkey" FOREIGN KEY ("section_id") REFERENCES "course_sections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_section_id_fkey" FOREIGN KEY ("section_id") REFERENCES "course_sections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_section_id_fkey" FOREIGN KEY ("section_id") REFERENCES "course_sections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "institution_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "assessments" ADD CONSTRAINT "assessments_section_id_fkey" FOREIGN KEY ("section_id") REFERENCES "course_sections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "assessments" ADD CONSTRAINT "assessments_section_id_fkey" FOREIGN KEY ("section_id") REFERENCES "course_sections"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "assessment_submissions" ADD CONSTRAINT "assessment_submissions_assessment_id_fkey" FOREIGN KEY ("assessment_id") REFERENCES "assessments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "assessment_submissions" ADD CONSTRAINT "assessment_submissions_assessment_id_fkey" FOREIGN KEY ("assessment_id") REFERENCES "assessments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "assessment_submissions" ADD CONSTRAINT "assessment_submissions_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "institution_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "assessment_submissions" ADD CONSTRAINT "assessment_submissions_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "institution_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_term_id_fkey" FOREIGN KEY ("term_id") REFERENCES "terms"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "transcripts" ADD CONSTRAINT "transcripts_term_id_fkey" FOREIGN KEY ("term_id") REFERENCES "terms"("id") ON DELETE CASCADE ON UPDATE CASCADE;
