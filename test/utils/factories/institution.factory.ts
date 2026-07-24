@@ -3,30 +3,21 @@ import { Institution } from '@modules/institution/domain/institution.entity';
 export function buildInstitutionProps(
   overrides?: Partial<{
     name: string;
-    slug: string;
-    institutionType: string;
-    contactEmail: string;
+    contactEmail: string | null;
     websiteUrl: string | null;
     logoUrl: string | null;
-    isVerified: boolean;
   }>,
 ): {
   name: string;
-  slug: string;
-  institutionType: string;
-  contactEmail: string;
+  contactEmail: string | null;
   websiteUrl: string | null;
   logoUrl: string | null;
-  isVerified: boolean;
 } {
   return {
     name: 'Test University',
-    slug: 'test-university',
-    institutionType: 'UNIVERSITY',
     contactEmail: 'contact@test.edu',
     websiteUrl: null,
     logoUrl: null,
-    isVerified: false,
     ...overrides,
   };
 }
@@ -34,12 +25,9 @@ export function buildInstitutionProps(
 export function buildInstitution(
   overrides?: Partial<{
     name: string;
-    slug: string;
-    institutionType: string;
-    contactEmail: string;
+    contactEmail: string | null;
     websiteUrl: string | null;
     logoUrl: string | null;
-    isVerified: boolean;
   }>,
   id?: string,
 ): Institution {

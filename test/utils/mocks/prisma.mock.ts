@@ -7,6 +7,7 @@ export class PrismaModelMock {
   public readonly delete = jest.fn();
   public readonly deleteMany = jest.fn();
   public readonly count = jest.fn();
+  public readonly upsert = jest.fn();
 }
 
 export class PrismaTransactionMock {
@@ -14,16 +15,14 @@ export class PrismaTransactionMock {
   public readonly institution = new PrismaModelMock();
   public readonly role = new PrismaModelMock();
   public readonly rolePermission = new PrismaModelMock();
-  public readonly institutionUser = new PrismaModelMock();
-  public readonly institutionUserRole = new PrismaModelMock();
   public readonly permission = new PrismaModelMock();
+  public readonly superAdmin = new PrismaModelMock();
+  public readonly userRole = new PrismaModelMock();
 
   public constructor() {
     this.institution.create.mockResolvedValue({ id: 'tx-inst-id' });
     this.role.create.mockResolvedValue({ id: 'tx-role-id' });
     this.user.create.mockResolvedValue({ id: 'tx-user-id' });
-    this.institutionUser.create.mockResolvedValue({ id: 'tx-iu-id' });
-    this.institutionUserRole.create.mockResolvedValue({ id: 'tx-iur-id' });
     this.rolePermission.create.mockResolvedValue({ id: 'tx-rp-id' });
     this.permission.findMany.mockResolvedValue([]);
     this.rolePermission.findMany.mockResolvedValue([]);
@@ -36,9 +35,9 @@ export class PrismaServiceMock {
   public readonly institution = new PrismaModelMock();
   public readonly role = new PrismaModelMock();
   public readonly rolePermission = new PrismaModelMock();
-  public readonly institutionUser = new PrismaModelMock();
-  public readonly institutionUserRole = new PrismaModelMock();
   public readonly permission = new PrismaModelMock();
+  public readonly superAdmin = new PrismaModelMock();
+  public readonly userRole = new PrismaModelMock();
   public readonly $transaction = jest.fn();
 
   public constructor() {

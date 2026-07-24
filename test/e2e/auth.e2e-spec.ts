@@ -19,7 +19,7 @@ describe('Auth (e2e)', () => {
   let redisMock: RedisServiceMock;
   let authRepositoryMock: {
     findByEmail: jest.Mock;
-    findInstitutionById: jest.Mock;
+    findSuperAdminByEmail: jest.Mock;
   };
 
   beforeAll(async () => {
@@ -27,7 +27,7 @@ describe('Auth (e2e)', () => {
     redisMock = new RedisServiceMock();
     authRepositoryMock = {
       findByEmail: jest.fn(),
-      findInstitutionById: jest.fn(),
+      findSuperAdminByEmail: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -63,95 +63,46 @@ describe('Auth (e2e)', () => {
   describe('POST /auth/login', () => {
     const loginUrl = '/auth/login';
 
-    it('returns 200 with JWT for valid global credentials (super admin, no institutionId)', async () => {
-      const userRecord = {
+    it('returns 200 with JWT for valid super admin credentials', async () => {
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue({
         id: 'super-admin-id',
         email: 'admin@escala.app',
-        passwordHash: `${VALID_SALT}:${VALID_HASH}`,
-        firstName: 'Super',
-        lastName: 'Admin',
-        ci: '00000000',
-        phone: null,
-        isSuperAdmin: true,
-        institutionId: null,
-      };
-      authRepositoryMock.findByEmail.mockResolvedValue(userRecord);
-      authRepositoryMock.findInstitutionById.mockResolvedValue(null);
-      prismaMock.institutionUser.findFirst.mockResolvedValue(null);
-      redisMock.pipeline.mockReturnValue({
-        set: jest.fn(),
-        del: jest.fn(),
-        sadd: jest.fn(),
-        expire: jest.fn(),
-        exec: jest.fn().mockResolvedValue([]),
+        password: `${VALID_SALT}:${VALID_HASH}`,
       });
+      authRepositoryMock.findByEmail.mockResolvedValue(null);
 
       const response = await request(app.getHttpServer())
         .post(loginUrl)
         .send({ email: 'admin@escala.app', password: VALID_PASSWORD })
         .expect(200);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body.user).toBeDefined();
-      expect(response.body.user.id).toBe('super-admin-id');
-      expect(response.body.user.isSuperAdmin).toBe(true);
-      expect(response.body.institution).toBeNull();
+      expect(response.body.data).toHaveProperty('accessToken');
+      expect(response.body.data.user.roleType).toBe('SUPER_ADMIN');
     });
 
-    it('returns 200 with JWT for valid institution user', async () => {
-      const userRecord = {
-        id: 'inst-user-id',
+    it('returns 200 with JWT for valid regular user credentials', async () => {
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue(null);
+      authRepositoryMock.findByEmail.mockResolvedValue({
+        id: 'user-id',
         email: 'user@institution.edu',
-        passwordHash: `${VALID_SALT}:${VALID_HASH}`,
-        firstName: 'Inst',
+        password: `${VALID_SALT}:${VALID_HASH}`,
+        firstName: 'Regular',
         lastName: 'User',
         ci: '11111111',
         phone: null,
-        isSuperAdmin: false,
-        institutionId: 'inst-1',
-      };
-      const institutionMembership = {
-        id: 'inst-1',
-        institutionId: 'inst-1',
-        institutionName: 'Test University',
-        institutionType: 'UNIVERSITY',
-        institutionUserId: 'iu-1',
-      };
-      authRepositoryMock.findByEmail.mockResolvedValue(userRecord);
-      authRepositoryMock.findInstitutionById.mockResolvedValue(
-        institutionMembership,
-      );
-      prismaMock.institutionUser.findFirst.mockResolvedValue({
-        id: 'iu-1',
-        userId: 'inst-user-id',
-        institutionId: 'inst-1',
-        isActive: true,
-        roles: [],
-      });
-      redisMock.pipeline.mockReturnValue({
-        set: jest.fn(),
-        del: jest.fn(),
-        sadd: jest.fn(),
-        expire: jest.fn(),
-        exec: jest.fn().mockResolvedValue([]),
       });
 
       const response = await request(app.getHttpServer())
         .post(loginUrl)
-        .send({
-          email: 'user@institution.edu',
-          password: VALID_PASSWORD,
-          institutionId: 'inst-1',
-        })
+        .send({ email: 'user@institution.edu', password: VALID_PASSWORD })
         .expect(200);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body.user.isSuperAdmin).toBe(false);
-      expect(response.body.institution).not.toBeNull();
-      expect(response.body.institution.institutionId).toBe('inst-1');
+      expect(response.body.data).toHaveProperty('accessToken');
+      expect(response.body.data.user.roleType).toBe('USER');
     });
 
     it('returns 401 when email does not exist', async () => {
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue(null);
       authRepositoryMock.findByEmail.mockResolvedValue(null);
 
       const response = await request(app.getHttpServer())
@@ -159,55 +110,35 @@ describe('Auth (e2e)', () => {
         .send({ email: 'nonexistent@test.com', password: VALID_PASSWORD })
         .expect(401);
 
-      expect(response.body.message).toContain('Invalid email or password');
+      expect(response.body.error.message).toContain(
+        'Invalid email or password',
+      );
     });
 
     it('returns 401 when password is incorrect', async () => {
-      // return a valid user but send wrong password
-      const userRecord = {
-        id: 'user-id',
-        email: 'user@test.com',
-        passwordHash: `${VALID_SALT}:${VALID_HASH}`,
-        firstName: 'Test',
-        lastName: 'User',
-        ci: '12345678',
-        phone: null,
-        isSuperAdmin: false,
-        institutionId: 'inst-1',
-      };
-      authRepositoryMock.findByEmail.mockResolvedValue(userRecord);
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+        password: `${VALID_SALT}:${VALID_HASH}`,
+      });
 
       const response = await request(app.getHttpServer())
         .post(loginUrl)
-        .send({
-          email: 'user@test.com',
-          password: 'wrong-password',
-          institutionId: 'inst-1',
-        })
+        .send({ email: 'admin@escala.app', password: 'wrong-password' })
         .expect(401);
 
-      expect(response.body.message).toContain('Invalid email or password');
+      expect(response.body.error.message).toContain(
+        'Invalid email or password',
+      );
     });
 
-    it('returns 401 when institution user does not provide institutionId', async () => {
-      const userRecord = {
-        id: 'user-id',
-        email: 'user@inst.edu',
-        passwordHash: `${VALID_SALT}:${VALID_HASH}`,
-        firstName: 'Inst',
-        lastName: 'User',
-        ci: '22222222',
-        phone: null,
-        isSuperAdmin: false,
-        institutionId: 'inst-1',
-      };
-      authRepositoryMock.findByEmail.mockResolvedValue(userRecord);
-
-      // No institutionId in request, but user is not super admin
-      await request(app.getHttpServer())
+    it('returns 400 when email is empty', async () => {
+      const response = await request(app.getHttpServer())
         .post(loginUrl)
-        .send({ email: 'user@inst.edu', password: VALID_PASSWORD })
-        .expect(401);
+        .send({ email: '', password: VALID_PASSWORD })
+        .expect(400);
+
+      expect(response.body.error.code).toBe('BAD_REQUEST');
     });
   });
 });

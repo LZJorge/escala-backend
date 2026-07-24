@@ -3,33 +3,28 @@ import { User } from '@core/domain/user.entity';
 export function buildUserProps(
   overrides?: Partial<{
     email: string;
-    passwordHash: string;
+    password: string;
     firstName: string;
     lastName: string;
     ci: string;
     phone: string | null;
-    isSuperAdmin: boolean;
-    institutionId: string | null;
   }>,
 ): {
   email: string;
-  passwordHash: string;
+  password: string;
   firstName: string;
   lastName: string;
   ci: string;
   phone: string | null;
-  isSuperAdmin: boolean;
-  institutionId: string | null;
 } {
   return {
     email: 'user@example.com',
-    passwordHash: 'salt:hash',
+    password:
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:3122d1dd0646fdad8330dbe454bcef4366840dd47b6fca5b8bd16ade0e69b46120b9fa7283d933c4218d1cdca8dfdda66e1040570fbd0ce0e9d9e5e748746dbe',
     firstName: 'Test',
     lastName: 'User',
     ci: '12345678',
     phone: null,
-    isSuperAdmin: false,
-    institutionId: null,
     ...overrides,
   };
 }
@@ -37,52 +32,13 @@ export function buildUserProps(
 export function buildUser(
   overrides?: Partial<{
     email: string;
-    passwordHash: string;
+    password: string;
     firstName: string;
     lastName: string;
     ci: string;
     phone: string | null;
-    isSuperAdmin: boolean;
-    institutionId: string | null;
   }>,
   id?: string,
 ): User {
   return new User(buildUserProps(overrides), id ?? 'test-user-id');
-}
-
-export function buildPrismaUserRecord(
-  overrides?: Partial<{
-    id: string;
-    email: string;
-    passwordHash: string;
-    firstName: string;
-    lastName: string;
-    ci: string;
-    phone: string | null;
-    isSuperAdmin: boolean;
-    institutionId: string | null;
-  }>,
-): {
-  id: string;
-  email: string;
-  passwordHash: string;
-  firstName: string;
-  lastName: string;
-  ci: string;
-  phone: string | null;
-  isSuperAdmin: boolean;
-  institutionId: string | null;
-} {
-  return {
-    id: 'test-user-id',
-    email: 'user@example.com',
-    passwordHash: 'salt:hash',
-    firstName: 'Test',
-    lastName: 'User',
-    ci: '12345678',
-    phone: null,
-    isSuperAdmin: false,
-    institutionId: null,
-    ...overrides,
-  };
 }

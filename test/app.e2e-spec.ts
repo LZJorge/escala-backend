@@ -32,7 +32,12 @@ describe('App (smoke)', () => {
     expect(app).toBeDefined();
   });
 
-  it('responds 404 on unknown route', () => {
-    return request(app.getHttpServer()).get('/unknown-route').expect(404);
+  it('responds with envelope error on unknown route', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/unknown-route')
+      .expect(404);
+
+    expect(response.body).toHaveProperty('error');
+    expect(response.body.error).toHaveProperty('code', 'NOT_FOUND');
   });
 });

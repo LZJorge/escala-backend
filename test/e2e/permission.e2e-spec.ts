@@ -55,9 +55,9 @@ describe('Permission (e2e)', () => {
         .get('/permissions')
         .expect(200);
 
-      expect(response.body).toHaveLength(2);
-      expect(response.body[0].code).toBe('system.admin');
-      expect(response.body[1].code).toBe('course.create');
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data[0].code).toBe('system.admin');
+      expect(response.body.data[1].code).toBe('course.create');
     });
   });
 });

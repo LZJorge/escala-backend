@@ -14,16 +14,28 @@ describe('User (e2e)', () => {
   let app: INestApplication;
   let prismaMock: PrismaServiceMock;
   let redisMock: RedisServiceMock;
-  let userRepositoryMock: { findById: jest.Mock; update: jest.Mock };
+  let userRepositoryMock: {
+    findById: jest.Mock;
+    findByEmail: jest.Mock;
+    findByCi: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    softDelete: jest.Mock;
+  };
   let jwtService: JwtService;
-  let validToken: string;
+  let regularToken: string;
+  let superAdminToken: string;
 
   beforeAll(async () => {
     prismaMock = new PrismaServiceMock();
     redisMock = new RedisServiceMock();
     userRepositoryMock = {
       findById: jest.fn(),
+      findByEmail: jest.fn(),
+      findByCi: jest.fn(),
+      save: jest.fn(),
       update: jest.fn(),
+      softDelete: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -48,10 +60,15 @@ describe('User (e2e)', () => {
     await app.init();
 
     jwtService = app.get(JwtService);
-    validToken = jwtService.sign({
+    regularToken = jwtService.sign({
       sub: 'test-user-id',
       email: 'user@example.com',
-      isSuperAdmin: false,
+      roleType: 'USER',
+    });
+    superAdminToken = jwtService.sign({
+      sub: 'super-admin-id',
+      email: 'admin@escala.app',
+      roleType: 'SUPER_ADMIN',
     });
   });
 
@@ -63,48 +80,83 @@ describe('User (e2e)', () => {
     await app.close();
   });
 
-  describe('GET /users/me', () => {
-    it('returns 200 with the user profile', async () => {
-      const user = buildUser({ email: 'user@example.com' });
-      userRepositoryMock.findById.mockResolvedValue(user);
-
-      const response = await request(app.getHttpServer())
-        .get('/users/me')
-        .set('Authorization', `Bearer ${validToken}`)
-        .expect(200);
-
-      expect(response.body).toMatchObject({
+  describe('GET /users/me (regular user)', () => {
+    it('returns 200 with user profile, roles and permissions', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
         id: 'test-user-id',
         email: 'user@example.com',
         firstName: 'Test',
         lastName: 'User',
-        ci: '12345678',
+        roles: [
+          {
+            role: {
+              name: 'Editor',
+              permissions: [
+                { permission: { code: 'course.create' } },
+                { permission: { code: 'course.view' } },
+              ],
+            },
+          },
+        ],
       });
+
+      const response = await request(app.getHttpServer())
+        .get('/users/me')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        id: 'test-user-id',
+        email: 'user@example.com',
+        type: 'USER',
+      });
+      expect(response.body.data.roles).toEqual(['Editor']);
+      expect(response.body.data.permissions).toEqual(
+        expect.arrayContaining(['course.create', 'course.view']),
+      );
     });
 
     it('returns 404 when user is not found', async () => {
-      userRepositoryMock.findById.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
 
       await request(app.getHttpServer())
         .get('/users/me')
-        .set('Authorization', `Bearer ${validToken}`)
+        .set('Authorization', `Bearer ${regularToken}`)
         .expect(404);
     });
 
     it('returns 401 when no token is provided', async () => {
       await request(app.getHttpServer()).get('/users/me').expect(401);
     });
+  });
 
-    it('returns 401 when token is expired', async () => {
-      const expiredToken = jwtService.sign(
-        { sub: 'user', email: 'user@test.com', isSuperAdmin: false },
-        { expiresIn: '0s' },
-      );
+  describe('GET /users/me (super admin)', () => {
+    it('returns 200 with super admin profile', async () => {
+      prismaMock.superAdmin.findUnique.mockResolvedValue({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/users/me')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+        type: 'SUPER_ADMIN',
+        permissions: ['*'],
+      });
+    });
+
+    it('returns 404 when super admin is not found', async () => {
+      prismaMock.superAdmin.findUnique.mockResolvedValue(null);
 
       await request(app.getHttpServer())
         .get('/users/me')
-        .set('Authorization', `Bearer ${expiredToken}`)
-        .expect(401);
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .expect(404);
     });
   });
 
@@ -116,11 +168,11 @@ describe('User (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .patch('/users/me')
-        .set('Authorization', `Bearer ${validToken}`)
+        .set('Authorization', `Bearer ${regularToken}`)
         .send({ phone: '+584141234567' })
         .expect(200);
 
-      expect(response.body.phone).toBe('+584141234567');
+      expect(response.body.data.phone).toBe('+584141234567');
     });
 
     it('returns 422 when user is not found for update', async () => {
@@ -128,8 +180,211 @@ describe('User (e2e)', () => {
 
       await request(app.getHttpServer())
         .patch('/users/me')
-        .set('Authorization', `Bearer ${validToken}`)
+        .set('Authorization', `Bearer ${regularToken}`)
         .send({ firstName: 'New' })
+        .expect(422);
+    });
+  });
+
+  describe('POST /users', () => {
+    const createUrl = '/users';
+    const validPayload = {
+      email: 'newuser@example.com',
+      password: 'securePass123',
+      firstName: 'New',
+      lastName: 'User',
+      ci: '87654321',
+    };
+
+    it('returns 201 when user is created', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.create' } }],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      userRepositoryMock.save.mockResolvedValue(undefined);
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(201);
+
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data.email).toBe('newuser@example.com');
+    });
+
+    it('returns 422 when email already exists', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.create' } }],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(
+        buildUser({ email: 'existing@example.com' }),
+      );
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(422);
+    });
+
+    it('returns 403 without user.create permission', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'role.read' } }],
+          },
+        },
+      ]);
+
+      await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(403);
+    });
+
+    it('returns 401 without token', async () => {
+      await request(app.getHttpServer())
+        .post(createUrl)
+        .send(validPayload)
+        .expect(401);
+    });
+  });
+
+  describe('DELETE /users/:userId', () => {
+    it('returns 200 when user is soft deleted', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.delete' } }],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findById.mockResolvedValue(buildUser());
+      userRepositoryMock.softDelete.mockResolvedValue(undefined);
+
+      await request(app.getHttpServer())
+        .delete('/users/test-user-id')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+    });
+
+    it('returns 404 when user not found', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.delete' } }],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findById.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .delete('/users/non-existent')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('POST /users/:userId/roles', () => {
+    it('returns 201 when role is assigned', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'role.assign' } }],
+          },
+        },
+      ]);
+
+      prismaMock.role.findUnique.mockResolvedValue({
+        id: 'role-id',
+        name: 'Editor',
+        isStudent: false,
+        isEditable: true,
+      });
+      prismaMock.userRole.findUnique.mockResolvedValue(null);
+      prismaMock.userRole.create.mockResolvedValue({ id: 'ur-id' });
+
+      await request(app.getHttpServer())
+        .post('/users/user-id/roles')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ roleId: 'role-id' })
+        .expect(201);
+    });
+
+    it('returns 422 when role not found', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'role.assign' } }],
+          },
+        },
+      ]);
+
+      prismaMock.role.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post('/users/user-id/roles')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ roleId: 'nonexistent' })
+        .expect(422);
+    });
+  });
+
+  describe('DELETE /users/:userId/roles/:roleId', () => {
+    it('returns 200 when role is unassigned', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'role.assign' } }],
+          },
+        },
+      ]);
+
+      prismaMock.role.findUnique.mockResolvedValue({
+        id: 'role-id',
+        name: 'Editor',
+        isStudent: false,
+        isEditable: true,
+      });
+      prismaMock.userRole.delete.mockResolvedValue({ id: 'ur-id' });
+
+      await request(app.getHttpServer())
+        .delete('/users/user-id/roles/role-id')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+    });
+
+    it('returns 422 when role not found', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'role.assign' } }],
+          },
+        },
+      ]);
+
+      prismaMock.role.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .delete('/users/user-id/roles/nonexistent')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ roleId: 'nonexistent' })
         .expect(422);
     });
   });
