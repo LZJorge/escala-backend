@@ -60,3 +60,51 @@ export class ProgramResponseDto {
   @ApiProperty()
   public createdAt: string;
 }
+
+export class PensumPrerequisiteDto {
+  @ApiProperty({ nullable: true })
+  public requiredCourseId: string | null;
+
+  @ApiProperty({ nullable: true })
+  public requiredCredits: number | null;
+}
+
+export class PensumCourseDto {
+  @ApiProperty()
+  public id: string;
+
+  @ApiProperty()
+  public code: string;
+
+  @ApiProperty()
+  public name: string;
+
+  @ApiProperty()
+  public credits: number;
+
+  @ApiProperty()
+  public termLevel: number;
+
+  @ApiProperty({ type: [PensumPrerequisiteDto] })
+  public prerequisites: PensumPrerequisiteDto[];
+}
+
+export class PensumResponseDto {
+  @ApiProperty()
+  public id: string;
+
+  @ApiProperty()
+  public name: string;
+
+  @ApiProperty({ enum: ['SEMESTER', 'QUARTER', 'YEAR'] })
+  public termType: string;
+
+  @ApiProperty()
+  public totalCredits: number;
+
+  @ApiProperty()
+  public updatedAt: string;
+
+  @ApiProperty({ type: [PensumCourseDto] })
+  public courses: PensumCourseDto[];
+}

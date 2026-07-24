@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Result } from '@core/domain/result';
 import { PROGRAM_REPOSITORY } from '../domain/program.repository';
-import type { ProgramRepository } from '../domain/program.repository';
+import type {
+  ProgramRepository,
+  PensumData,
+  PensumCourse,
+  PensumCoursePrereq,
+} from '../domain/program.repository';
 import { Program } from '../domain/program.entity';
 import type { TermType } from '@prisma/client';
 
@@ -142,5 +147,51 @@ export class ProgramService {
     await this.repository.softDelete(id);
 
     return Result.ok(undefined);
+  }
+
+  public async getPensum(id: string): Promise<
+    Result<{
+      id: string;
+      name: string;
+      termType: string;
+      totalCredits: number;
+      updatedAt: string;
+      courses: Array<{
+        id: string;
+        code: string;
+        name: string;
+        credits: number;
+        termLevel: number;
+        prerequisites: Array<{
+          requiredCourseId: string | null;
+          requiredCredits: number | null;
+        }>;
+      }>;
+    }>
+  > {
+    const data: PensumData | null = await this.repository.getPensum(id);
+
+    if (!data) {
+      return Result.fail('Program not found');
+    }
+
+    return Result.ok({
+      id: data.id,
+      name: data.name,
+      termType: data.termType,
+      totalCredits: data.totalCredits,
+      updatedAt: data.updatedAt.toISOString(),
+      courses: data.courses.map((c: PensumCourse) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        credits: c.credits,
+        termLevel: c.termLevel,
+        prerequisites: c.prerequisites.map((p: PensumCoursePrereq) => ({
+          requiredCourseId: p.requiredCourseId,
+          requiredCredits: p.requiredCredits,
+        })),
+      })),
+    });
   }
 }

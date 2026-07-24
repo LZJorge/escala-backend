@@ -156,6 +156,7 @@ model Program {
   termType     TermType  @map("term_type")
   totalCredits Int       @map("total_credits")
   createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
   courses Course[]
@@ -172,6 +173,8 @@ model Course {
   credits   Int
   termLevel Int       @map("term_level")
   isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
@@ -186,10 +189,12 @@ model Course {
 
 /* Handles complex academic chain dependencies permitting a course to block registration until specific prior conditions or credit thresholds are satisfied */
 model CoursePrerequisite {
-  id               String  @id @default(uuid()) @db.Uuid
-  courseId         String  @map("course_id") @db.Uuid
-  requiredCourseId String? @map("required_course_id") @db.Uuid
-  requiredCredits  Int?    @map("required_credits")
+  id               String    @id @default(uuid()) @db.Uuid
+  courseId         String    @map("course_id") @db.Uuid
+  requiredCourseId String?   @map("required_course_id") @db.Uuid
+  requiredCredits  Int?      @map("required_credits")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   course         Course  @relation("CoursePrerequisites", fields: [courseId], references: [id], onDelete: Cascade)
   requiredCourse Course? @relation("RequiredCourses", fields: [requiredCourseId], references: [id])

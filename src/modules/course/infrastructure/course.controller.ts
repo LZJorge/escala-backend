@@ -1,0 +1,131 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Put,
+  Body,
+  Param,
+  UnprocessableEntityException,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
+import { RequirePermission } from '@modules/auth/infrastructure/decorators/require-permission.decorator';
+import { CourseService } from '../application/course.service';
+import {
+  CreateCourseDto,
+  UpdateCourseDto,
+  SetPrerequisitesDto,
+  PrerequisiteEntryDto,
+  CourseResponseDto,
+} from '../application/course.dto';
+import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+
+@ApiTags('Courses')
+@Controller('courses')
+export class CourseController {
+  constructor(private readonly service: CourseService) {}
+
+  @Post()
+  @RequirePermission('course.create')
+  @ApiOperation({ summary: 'Create a course' })
+  @ApiCreatedResponse({ type: CourseResponseDto })
+  @ApiErrors(401, 403, 422)
+  public async create(
+    @Body() body: CreateCourseDto,
+  ): Promise<CourseResponseDto> {
+    const result = await this.service.create(body);
+
+    if (result.isFailure) {
+      throw new UnprocessableEntityException(result.error);
+    }
+
+    return result.value;
+  }
+
+  @Get('by-program/:programId')
+  @RequirePermission('course.read')
+  @ApiOperation({ summary: 'List courses by program' })
+  @ApiOkResponse({ type: [CourseResponseDto] })
+  public async findByProgram(
+    @Param('programId') programId: string,
+  ): Promise<CourseResponseDto[]> {
+    const result = await this.service.findByProgram(programId);
+
+    return result.value;
+  }
+
+  @Get(':courseId')
+  @RequirePermission('course.read')
+  @ApiOperation({ summary: 'Get course by ID' })
+  @ApiOkResponse({ type: CourseResponseDto })
+  @ApiErrors(404)
+  public async findById(
+    @Param('courseId') courseId: string,
+  ): Promise<CourseResponseDto> {
+    const result = await this.service.findById(courseId);
+
+    if (result.isFailure) {
+      throw new NotFoundException(result.error);
+    }
+
+    return result.value;
+  }
+
+  @Patch(':courseId')
+  @RequirePermission('course.update')
+  @ApiOperation({ summary: 'Update a course' })
+  @ApiOkResponse({ type: CourseResponseDto })
+  @ApiErrors(401, 403, 404, 422)
+  public async update(
+    @Param('courseId') courseId: string,
+    @Body() body: UpdateCourseDto,
+  ): Promise<CourseResponseDto> {
+    const result = await this.service.update(courseId, body);
+
+    if (result.isFailure) {
+      throw new UnprocessableEntityException(result.error);
+    }
+
+    return result.value;
+  }
+
+  @Delete(':courseId')
+  @RequirePermission('course.delete')
+  @ApiOperation({ summary: 'Soft delete a course' })
+  @ApiOkResponse({ description: 'Course deleted' })
+  @ApiErrors(401, 403, 404, 422)
+  public async delete(@Param('courseId') courseId: string): Promise<void> {
+    const result = await this.service.delete(courseId);
+
+    if (result.isFailure) {
+      throw new NotFoundException(result.error);
+    }
+  }
+
+  @Put(':courseId/prerequisites')
+  @RequirePermission('course.update')
+  @ApiOperation({ summary: 'Set prerequisites for a course (replaces all)' })
+  @ApiOkResponse({ description: 'Prerequisites updated' })
+  @ApiErrors(401, 403, 404, 422)
+  public async setPrerequisites(
+    @Param('courseId') courseId: string,
+    @Body() body: SetPrerequisitesDto,
+  ): Promise<void> {
+    const mapped = body.prerequisites.map((p: PrerequisiteEntryDto) => ({
+      requiredCourseId: p.requiredCourseId ?? null,
+      requiredCredits: p.requiredCredits ?? null,
+    }));
+    const result = await this.service.setPrerequisites(courseId, mapped);
+
+    if (result.isFailure) {
+      throw new NotFoundException(result.error);
+    }
+  }
+}

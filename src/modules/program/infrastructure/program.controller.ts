@@ -21,6 +21,7 @@ import {
   CreateProgramDto,
   UpdateProgramDto,
   ProgramResponseDto,
+  PensumResponseDto,
 } from '../application/program.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 
@@ -86,6 +87,25 @@ export class ProgramController {
 
     if (result.isFailure) {
       throw new UnprocessableEntityException(result.error);
+    }
+
+    return result.value;
+  }
+
+  @Get(':programId/pensum')
+  @RequirePermission('program.read')
+  @ApiOperation({
+    summary: 'Get program pensum with all courses and prerequisites',
+  })
+  @ApiOkResponse({ type: PensumResponseDto })
+  @ApiErrors(404)
+  public async getPensum(
+    @Param('programId') programId: string,
+  ): Promise<PensumResponseDto> {
+    const result = await this.service.getPensum(programId);
+
+    if (result.isFailure) {
+      throw new NotFoundException(result.error);
     }
 
     return result.value;
