@@ -20,7 +20,11 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:integration": "jest --config ./test/jest-integration.json",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "bun run test:e2e:up && bun run test:e2e:db && bun run test:e2e:run; bun run test:e2e:down",
+    "test:e2e:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "test:e2e:db": "dotenv -e .env.test -- npx prisma db push --accept-data-loss",
+    "test:e2e:run": "dotenv -e .env.test -- jest --config ./test/jest-e2e.json --runInBand",
+    "test:e2e:down": "docker compose -f docker-compose.test.yml down -v",
     "prepare": "husky"
   },
   "dependencies": {
