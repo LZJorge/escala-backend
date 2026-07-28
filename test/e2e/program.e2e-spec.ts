@@ -15,7 +15,7 @@ async function loginWithPermissions(
   const permissions = await Promise.all(
     permissionCodes.map((code) =>
       prisma.permission.create({
-        data: { code, module: code.split('.')[0]!, description: code },
+        data: { code, module: code.split('.')[0], description: code },
       }),
     ),
   );
@@ -47,7 +47,10 @@ async function loginWithPermissions(
 
   const loginRes = await request(app.getHttpServer())
     .post('/auth/login')
-    .send({ email: `prog-op-${suffix}@test.edu`, password: 'operator_password' })
+    .send({
+      email: `prog-op-${suffix}@test.edu`,
+      password: 'operator_password',
+    })
     .expect(200);
 
   return loginRes.body.data.accessToken as string;
@@ -84,10 +87,19 @@ describe('Programs', () => {
 
   describe('GET /programs/:id/pensum', () => {
     it('returns the program with courses and prerequisites nested', async () => {
-      const token = await loginWithPermissions(app, prisma, ['program.read'], 'pensum');
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['program.read'],
+        'pensum',
+      );
 
       const program = await prisma.program.create({
-        data: { name: 'Computer Science', termType: 'SEMESTER', totalCredits: 120 },
+        data: {
+          name: 'Computer Science',
+          termType: 'SEMESTER',
+          totalCredits: 120,
+        },
       });
 
       const courseA = await prisma.course.create({
@@ -148,7 +160,12 @@ describe('Programs', () => {
 
   describe('DELETE /programs/:id', () => {
     it('soft-deletes the program and preserves associated courses', async () => {
-      const token = await loginWithPermissions(app, prisma, ['program.delete'], 'deleter');
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['program.delete'],
+        'deleter',
+      );
 
       const program = await prisma.program.create({
         data: { name: 'To Delete', termType: 'SEMESTER', totalCredits: 60 },
@@ -178,7 +195,7 @@ describe('Programs', () => {
         where: { programId: program.id, deletedAt: null },
       });
       expect(courses).toHaveLength(1);
-      expect(courses[0]!.code).toBe('DEL101');
+      expect(courses[0].code).toBe('DEL101');
     });
   });
 });

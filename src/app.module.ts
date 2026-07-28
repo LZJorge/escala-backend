@@ -9,6 +9,7 @@ import { PermissionModule } from '@modules/permission/infrastructure/permission.
 import { RoleModule } from '@modules/role/infrastructure/role.module';
 import { ProgramModule } from '@modules/program/infrastructure/program.module';
 import { CourseModule } from '@modules/course/infrastructure/course.module';
+import { TermModule } from '@modules/term/infrastructure/term.module';
 import { ExceptionFilter } from '@core/infrastructure/http/exception.filter';
 import { TransformInterceptor } from '@core/infrastructure/http/transform.interceptor';
 
@@ -23,6 +24,7 @@ import { TransformInterceptor } from '@core/infrastructure/http/transform.interc
     RoleModule,
     ProgramModule,
     CourseModule,
+    TermModule,
   ],
   controllers: [],
   providers: [

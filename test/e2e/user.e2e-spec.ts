@@ -15,7 +15,7 @@ async function loginWithPermissions(
   const permissions = await Promise.all(
     permissionCodes.map((code) =>
       prisma.permission.create({
-        data: { code, module: code.split('.')[0]!, description: code },
+        data: { code, module: code.split('.')[0], description: code },
       }),
     ),
   );
@@ -47,7 +47,10 @@ async function loginWithPermissions(
 
   const loginResponse = await request(app.getHttpServer())
     .post('/auth/login')
-    .send({ email: `operator-${suffix}@test.edu`, password: 'operator_password' })
+    .send({
+      email: `operator-${suffix}@test.edu`,
+      password: 'operator_password',
+    })
     .expect(200);
 
   return loginResponse.body.data.accessToken as string;

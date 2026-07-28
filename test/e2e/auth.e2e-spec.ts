@@ -23,7 +23,7 @@ describe('Auth', () => {
         transform: true,
       }),
     );
-    
+
     prisma = app.get(PrismaService);
     await app.init();
   });

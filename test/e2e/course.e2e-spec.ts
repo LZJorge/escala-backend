@@ -15,7 +15,7 @@ async function loginWithPermissions(
   const permissions = await Promise.all(
     permissionCodes.map((code) =>
       prisma.permission.create({
-        data: { code, module: code.split('.')[0]!, description: code },
+        data: { code, module: code.split('.')[0], description: code },
       }),
     ),
   );
@@ -85,7 +85,12 @@ describe('Courses', () => {
 
   describe('PUT /courses/:courseId/prerequisites', () => {
     it('replaces old prereqs and stores a requiredCourseId', async () => {
-      const token = await loginWithPermissions(app, prisma, ['course.update'], 'prereq');
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['course.update'],
+        'prereq',
+      );
 
       const program = await prisma.program.create({
         data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
@@ -136,12 +141,17 @@ describe('Courses', () => {
       });
 
       expect(prereqs).toHaveLength(1);
-      expect(prereqs[0]!.requiredCourseId).toBe(physics.id);
-      expect(prereqs[0]!.requiredCredits).toBeNull();
+      expect(prereqs[0].requiredCourseId).toBe(physics.id);
+      expect(prereqs[0].requiredCredits).toBeNull();
     });
 
     it('stores a prerequisite with requiredCredits only', async () => {
-      const token = await loginWithPermissions(app, prisma, ['course.update'], 'credits');
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['course.update'],
+        'credits',
+      );
 
       const program = await prisma.program.create({
         data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
@@ -168,14 +178,19 @@ describe('Courses', () => {
       });
 
       expect(prereqs).toHaveLength(1);
-      expect(prereqs[0]!.requiredCourseId).toBeNull();
-      expect(prereqs[0]!.requiredCredits).toBe(30);
+      expect(prereqs[0].requiredCourseId).toBeNull();
+      expect(prereqs[0].requiredCredits).toBe(30);
     });
   });
 
   describe('GET /courses/by-program/:programId', () => {
     it('returns only courses from the specified program', async () => {
-      const token = await loginWithPermissions(app, prisma, ['course.read'], 'byprog');
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['course.read'],
+        'byprog',
+      );
 
       const engineering = await prisma.program.create({
         data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },

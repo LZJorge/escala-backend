@@ -35,6 +35,7 @@ const PERMISSIONS: Array<{ code: string; module: string; description: string }> 
   { code: 'term.read', module: 'term', description: 'View academic terms' },
   { code: 'term.update', module: 'term', description: 'Modify term dates' },
   { code: 'term.close', module: 'term', description: 'Close a term (immutable snapshot)' },
+  { code: 'term.delete', module: 'term', description: 'Delete upcoming terms' },
   { code: 'enrollment.create', module: 'enrollment', description: 'Enroll students in sections' },
   { code: 'enrollment.read', module: 'enrollment', description: 'View enrollment records' },
   { code: 'enrollment.drop', module: 'enrollment', description: 'Drop student enrollments' },

@@ -22,7 +22,7 @@ describe('Permissions', () => {
         transform: true,
       }),
     );
-    
+
     prisma = app.get(PrismaService);
     await app.init();
   });
@@ -39,8 +39,16 @@ describe('Permissions', () => {
     it('returns all permissions in an envelope', async () => {
       await prisma.permission.createMany({
         data: [
-          { code: 'course.read', module: 'course', description: 'View courses' },
-          { code: 'course.create', module: 'course', description: 'Create courses' },
+          {
+            code: 'course.read',
+            module: 'course',
+            description: 'View courses',
+          },
+          {
+            code: 'course.create',
+            module: 'course',
+            description: 'Create courses',
+          },
           { code: 'user.read', module: 'user', description: 'View users' },
         ],
       });

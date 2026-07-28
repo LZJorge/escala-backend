@@ -1,0 +1,74 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsISO8601,
+  MaxLength,
+  IsEnum,
+} from 'class-validator';
+import { TermStatus } from '@prisma/client';
+
+export class CreateTermDto {
+  @ApiProperty({ example: 'Semester 2026-I' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  public readonly name: string;
+
+  @ApiProperty({ example: '2026-02-01' })
+  @IsISO8601()
+  public readonly startDate: string;
+
+  @ApiProperty({ example: '2026-06-30' })
+  @IsISO8601()
+  public readonly endDate: string;
+}
+
+export class UpdateTermDto {
+  @ApiPropertyOptional({ example: 'Semester 2026-I' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  public readonly name?: string;
+
+  @ApiPropertyOptional({ example: '2026-02-01' })
+  @IsOptional()
+  @IsISO8601()
+  public readonly startDate?: string;
+
+  @ApiPropertyOptional({ example: '2026-06-30' })
+  @IsOptional()
+  @IsISO8601()
+  public readonly endDate?: string;
+}
+
+export class ChangeTermStatusDto {
+  @ApiProperty({ enum: TermStatus, example: TermStatus.ACTIVE })
+  @IsEnum(TermStatus)
+  public readonly status: TermStatus;
+}
+
+export class TermResponseDto {
+  @ApiProperty()
+  public id: string;
+
+  @ApiProperty()
+  public name: string;
+
+  @ApiProperty()
+  public startDate: string;
+
+  @ApiProperty()
+  public endDate: string;
+
+  @ApiProperty({ enum: TermStatus })
+  public status: string;
+
+  @ApiProperty()
+  public createdAt: string;
+
+  @ApiProperty()
+  public updatedAt: string;
+}
