@@ -14,7 +14,7 @@ export function buildProgramProps(
 } {
   return {
     name: 'Computer Science',
-    termType: 'SEMESTER' as TermType,
+    termType: 'SEMESTER',
     totalCredits: 160,
     ...overrides,
   };

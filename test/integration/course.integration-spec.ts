@@ -100,15 +100,29 @@ describe('Course (e2e)', () => {
 
     it('returns 201 when creating a course', async () => {
       courseRepoMock.create.mockResolvedValue(
-        buildCourse({ programId: PROG_UUID, code: 'CS101', name: 'Intro', credits: 4, termLevel: 1 }, COURSE_UUID),
+        buildCourse(
+          {
+            programId: PROG_UUID,
+            code: 'CS101',
+            name: 'Intro',
+            credits: 4,
+            termLevel: 1,
+          },
+          COURSE_UUID,
+        ),
       );
 
       const response = await request(app.getHttpServer())
         .post(url)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ programId: PROG_UUID, code: 'CS101', name: 'Intro', credits: 4, termLevel: 1 })
+        .send({
+          programId: PROG_UUID,
+          code: 'CS101',
+          name: 'Intro',
+          credits: 4,
+          termLevel: 1,
+        })
         .expect(201);
-
       expect(response.body.data.id).toBe(COURSE_UUID);
       expect(response.body.data.code).toBe('CS101');
     });
@@ -116,7 +130,13 @@ describe('Course (e2e)', () => {
     it('returns 401 without token', async () => {
       await request(app.getHttpServer())
         .post(url)
-        .send({ programId: PROG_UUID, code: 'CS101', name: 'Intro', credits: 4, termLevel: 1 })
+        .send({
+          programId: PROG_UUID,
+          code: 'CS101',
+          name: 'Intro',
+          credits: 4,
+          termLevel: 1,
+        })
         .expect(401);
     });
   });
@@ -124,11 +144,21 @@ describe('Course (e2e)', () => {
   describe('GET /courses/by-program/:programId', () => {
     it('returns 200 with course list', async () => {
       courseRepoMock.findAllByProgram.mockResolvedValue([
-        buildCourse({ code: 'CS101', name: 'Intro', termLevel: 1 }, COURSE_UUID),
-        buildCourse({ code: 'CS201', name: 'Advanced', termLevel: 2 }, COURSE2_UUID),
+        buildCourse(
+          { code: 'CS101', name: 'Intro', termLevel: 1 },
+          COURSE_UUID,
+        ),
+        buildCourse(
+          { code: 'CS201', name: 'Advanced', termLevel: 2 },
+          COURSE2_UUID,
+        ),
       ]);
       courseRepoMock.getPrerequisitesForCourses.mockResolvedValue([
-        { courseId: COURSE2_UUID, requiredCourseId: COURSE_UUID, requiredCredits: null },
+        {
+          courseId: COURSE2_UUID,
+          requiredCourseId: COURSE_UUID,
+          requiredCredits: null,
+        },
       ]);
 
       const response = await request(app.getHttpServer())
@@ -139,7 +169,11 @@ describe('Course (e2e)', () => {
       expect(response.body.data).toHaveLength(2);
       expect(response.body.data[0].prerequisites).toEqual([]);
       expect(response.body.data[1].prerequisites).toEqual([
-        { courseId: COURSE2_UUID, requiredCourseId: COURSE_UUID, requiredCredits: null },
+        {
+          courseId: COURSE2_UUID,
+          requiredCourseId: COURSE_UUID,
+          requiredCredits: null,
+        },
       ]);
     });
   });

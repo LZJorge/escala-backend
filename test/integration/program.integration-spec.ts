@@ -98,7 +98,10 @@ describe('Program (e2e)', () => {
 
     it('returns 201 when creating a program', async () => {
       programRepoMock.create.mockResolvedValue(
-        buildProgram({ name: 'Engineering', termType: 'SEMESTER', totalCredits: 160 }, 'prog-1'),
+        buildProgram(
+          { name: 'Engineering', termType: 'SEMESTER', totalCredits: 160 },
+          'prog-1',
+        ),
       );
 
       const response = await request(app.getHttpServer())
@@ -189,9 +192,7 @@ describe('Program (e2e)', () => {
 
   describe('DELETE /programs/:programId', () => {
     it('returns 200 when deleting', async () => {
-      programRepoMock.findById.mockResolvedValue(
-        buildProgram({}, 'prog-1'),
-      );
+      programRepoMock.findById.mockResolvedValue(buildProgram({}, 'prog-1'));
 
       await request(app.getHttpServer())
         .delete('/programs/prog-1')
