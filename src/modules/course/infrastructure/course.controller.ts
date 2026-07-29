@@ -7,8 +7,6 @@ import {
   Put,
   Body,
   Param,
-  UnprocessableEntityException,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +24,8 @@ import {
   CourseResponseDto,
 } from '../application/course.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Courses')
 @Controller('courses')
@@ -43,7 +43,10 @@ export class CourseController {
     const result = await this.service.create(body);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_COURSE_CREATION_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -72,7 +75,10 @@ export class CourseController {
     const result = await this.service.findById(courseId);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_COURSE_NOT_FOUND,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -90,7 +96,10 @@ export class CourseController {
     const result = await this.service.update(courseId, body);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_COURSE_UPDATE_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -105,7 +114,16 @@ export class CourseController {
     const result = await this.service.delete(courseId);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      if (result.error === 'Course not found') {
+        throw new DomainException(
+          ErrorCodes.ERR_COURSE_NOT_FOUND,
+          result.error,
+        );
+      }
+      throw new DomainException(
+        ErrorCodes.ERR_COURSE_DELETE_FAILED,
+        result.error as string,
+      );
     }
   }
 
@@ -125,7 +143,10 @@ export class CourseController {
     const result = await this.service.setPrerequisites(courseId, mapped);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_COURSE_NOT_FOUND,
+        result.error as string,
+      );
     }
   }
 }

@@ -6,8 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  UnprocessableEntityException,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +22,8 @@ import {
   PensumResponseDto,
 } from '../application/program.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Programs')
 @Controller('programs')
@@ -41,7 +41,10 @@ export class ProgramController {
     const result = await this.service.create(body);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_CREATION_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -68,7 +71,10 @@ export class ProgramController {
     const result = await this.service.findById(programId);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -86,7 +92,10 @@ export class ProgramController {
     const result = await this.service.update(programId, body);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_UPDATE_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -105,7 +114,10 @@ export class ProgramController {
     const result = await this.service.getPensum(programId);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -120,7 +132,16 @@ export class ProgramController {
     const result = await this.service.delete(programId);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      if (result.error === 'Program not found') {
+        throw new DomainException(
+          ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+          result.error,
+        );
+      }
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_DELETE_FAILED,
+        result.error as string,
+      );
     }
   }
 }

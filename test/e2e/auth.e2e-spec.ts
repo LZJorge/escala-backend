@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { clearDatabase } from '../utils/prisma.test-utils';
 import { randomBytes, scryptSync } from 'node:crypto';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('Auth', () => {
   let app: INestApplication;
@@ -97,38 +98,75 @@ describe('Auth', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'admin@test.edu', password: 'wrong_password' })
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_INVALID_CREDENTIALS,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+      expect(response.body).toHaveProperty('message');
     });
 
     it('returns 401 for a non-existent email', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 'ghost@test.edu', password: 'anything' })
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_INVALID_CREDENTIALS,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 400 for empty credentials', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: '', password: '' })
         .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+      expect(response.body).toHaveProperty('details');
     });
 
     it('returns 400 when email field is missing', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ password: 'test' })
         .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 400 when email has wrong type', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: 123, password: 'test' })
         .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

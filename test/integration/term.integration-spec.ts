@@ -7,6 +7,7 @@ import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { TERM_REPOSITORY } from '@modules/term/domain/term.repository';
 import { Term } from '@modules/term/domain/term.entity';
+import { TermStatus } from '@prisma/client';
 import { PrismaServiceMock } from '../utils/mocks/prisma.mock';
 import { RedisServiceMock } from '../utils/mocks/redis.mock';
 
@@ -15,7 +16,7 @@ function buildTerm(
     name: string;
     startDate: Date;
     endDate: Date;
-    status: string;
+    status: TermStatus;
   }> = {},
   id?: string,
 ): Term {
@@ -24,7 +25,7 @@ function buildTerm(
       name: 'Semester 2026-I',
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-07-31'),
-      status: 'UPCOMING',
+      status: TermStatus.UPCOMING,
       ...overrides,
     },
     id,
@@ -148,7 +149,7 @@ describe('Term (e2e)', () => {
   describe('GET /terms', () => {
     it('returns 200 with term list', async () => {
       termRepoMock.findAll.mockResolvedValue([
-        buildTerm({ name: 'Spring', status: 'ACTIVE' }, 'term-1'),
+        buildTerm({ name: 'Spring', status: TermStatus.ACTIVE }, 'term-1'),
       ]);
 
       const response = await request(app.getHttpServer())
@@ -164,7 +165,7 @@ describe('Term (e2e)', () => {
   describe('GET /terms/active', () => {
     it('returns 200 with the active term', async () => {
       termRepoMock.findActive.mockResolvedValue(
-        buildTerm({ name: 'Current', status: 'ACTIVE' }, 'term-1'),
+        buildTerm({ name: 'Current', status: TermStatus.ACTIVE }, 'term-1'),
       );
 
       const response = await request(app.getHttpServer())
@@ -241,7 +242,7 @@ describe('Term (e2e)', () => {
 
     it('returns 422 when term is CLOSED', async () => {
       termRepoMock.findById.mockResolvedValue(
-        buildTerm({ name: 'Old', status: 'CLOSED' }, 'term-1'),
+        buildTerm({ name: 'Old', status: TermStatus.CLOSED }, 'term-1'),
       );
 
       await request(app.getHttpServer())
@@ -254,17 +255,17 @@ describe('Term (e2e)', () => {
 
   describe('PATCH /terms/:id/status', () => {
     it('returns 200 transitioning from UPCOMING to ACTIVE', async () => {
-      const existing = buildTerm({ status: 'UPCOMING' }, 'term-1');
+      const existing = buildTerm({ status: TermStatus.UPCOMING }, 'term-1');
       termRepoMock.findById.mockResolvedValue(existing);
       termRepoMock.findActive.mockResolvedValue(null);
       termRepoMock.update.mockResolvedValue(
-        buildTerm({ status: 'ACTIVE' }, 'term-1'),
+        buildTerm({ status: TermStatus.ACTIVE }, 'term-1'),
       );
 
       const response = await request(app.getHttpServer())
         .patch('/terms/term-1/status')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'ACTIVE' })
+        .send({ status: TermStatus.ACTIVE })
         .expect(200);
 
       expect(response.body.data.status).toBe('ACTIVE');
@@ -272,28 +273,31 @@ describe('Term (e2e)', () => {
 
     it('returns 422 when skipping from UPCOMING to CLOSED', async () => {
       termRepoMock.findById.mockResolvedValue(
-        buildTerm({ status: 'UPCOMING' }, 'term-1'),
+        buildTerm({ status: TermStatus.UPCOMING }, 'term-1'),
       );
 
       await request(app.getHttpServer())
         .patch('/terms/term-1/status')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'CLOSED' })
+        .send({ status: TermStatus.CLOSED })
         .expect(422);
     });
 
     it('returns 409 when another term is already ACTIVE', async () => {
       termRepoMock.findById.mockResolvedValue(
-        buildTerm({ status: 'UPCOMING' }, 'term-2'),
+        buildTerm({ status: TermStatus.UPCOMING }, 'term-2'),
       );
       termRepoMock.findActive.mockResolvedValue(
-        buildTerm({ name: 'Active Spring', status: 'ACTIVE' }, 'term-1'),
+        buildTerm(
+          { name: 'Active Spring', status: TermStatus.ACTIVE },
+          'term-1',
+        ),
       );
 
       await request(app.getHttpServer())
         .patch('/terms/term-2/status')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'ACTIVE' })
+        .send({ status: TermStatus.ACTIVE })
         .expect(409);
     });
   });
@@ -301,7 +305,7 @@ describe('Term (e2e)', () => {
   describe('DELETE /terms/:id', () => {
     it('returns 200 when deleting an UPCOMING term', async () => {
       termRepoMock.findById.mockResolvedValue(
-        buildTerm({ status: 'UPCOMING' }, 'term-1'),
+        buildTerm({ status: TermStatus.UPCOMING }, 'term-1'),
       );
       termRepoMock.countSections.mockResolvedValue(0);
 
@@ -313,7 +317,7 @@ describe('Term (e2e)', () => {
 
     it('returns 422 when term has sections', async () => {
       termRepoMock.findById.mockResolvedValue(
-        buildTerm({ status: 'UPCOMING' }, 'term-1'),
+        buildTerm({ status: TermStatus.UPCOMING }, 'term-1'),
       );
       termRepoMock.countSections.mockResolvedValue(3);
 

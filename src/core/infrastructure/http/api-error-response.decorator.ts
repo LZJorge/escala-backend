@@ -23,10 +23,11 @@ export function ApiErrors(
           type: 'object',
           properties: {
             statusCode: { type: 'number', example: status },
+            errorCode: { type: 'string', example: 'ERR_SAMPLE_CODE' },
             message: { type: 'string', example: ERROR_LABELS[status] },
-            error: {
-              type: 'string',
-              example: ERROR_LABELS[status] ?? 'Error',
+            details: {
+              type: 'object',
+              example: { field: 'value' },
             },
             timestamp: {
               type: 'string',

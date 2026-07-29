@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { clearDatabase } from '../utils/prisma.test-utils';
 import { randomBytes, scryptSync } from 'node:crypto';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 async function loginWithPermissions(
   app: INestApplication,
@@ -211,7 +212,7 @@ describe('Users', () => {
 
       const token: string = loginResponse.body.data.accessToken;
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/users')
         .set('Authorization', `Bearer ${token}`)
         .send({
@@ -222,6 +223,13 @@ describe('Users', () => {
           ci: 'fail-ci',
         })
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/users',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -303,7 +311,11 @@ describe('Users', () => {
         })
         .expect(422);
 
-      expect(response.body.error.message).toContain('Email already in use');
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
+        statusCode: 422,
+      });
+      expect(response.body.message).toContain('Email already in use');
     });
 
     it('returns 422 when creating a user with an existing CI', async () => {
@@ -339,7 +351,11 @@ describe('Users', () => {
         })
         .expect(422);
 
-      expect(response.body.error.message).toContain('CI already in use');
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.ERR_USER_CI_EXISTS,
+        statusCode: 422,
+      });
+      expect(response.body.message).toContain('CI already in use');
     });
   });
 });

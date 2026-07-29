@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { clearDatabase } from '../utils/prisma.test-utils';
 import { randomBytes, scryptSync } from 'node:crypto';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 async function loginWithPermissions(
   app: INestApplication,
@@ -116,7 +117,7 @@ describe('Terms', () => {
         'create-bad-dates',
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/terms')
         .set('Authorization', `Bearer ${token}`)
         .send({
@@ -125,6 +126,13 @@ describe('Terms', () => {
           endDate: '2026-03-01',
         })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_TERM_CREATION_FAILED,
+        path: '/terms',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('rejects requests without term.create permission', async () => {
@@ -135,7 +143,7 @@ describe('Terms', () => {
         'create-no-perm',
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/terms')
         .set('Authorization', `Bearer ${token}`)
         .send({
@@ -144,6 +152,13 @@ describe('Terms', () => {
           endDate: '2026-07-31',
         })
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/terms',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -191,10 +206,17 @@ describe('Terms', () => {
         'get-notfound',
       );
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/terms/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_TERM_NOT_FOUND,
+        path: '/terms/00000000-0000-0000-0000-000000000000',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns the active term via GET /terms/active', async () => {
@@ -270,11 +292,18 @@ describe('Terms', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch(`/terms/${term.id}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Should Not Work' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_TERM_UPDATE_FAILED,
+        path: `/terms/${term.id}`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -322,11 +351,18 @@ describe('Terms', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch(`/terms/${term.id}/status`)
         .set('Authorization', `Bearer ${token}`)
         .send({ status: 'CLOSED' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_TERM_CLOSE_FAILED,
+        path: `/terms/${term.id}/status`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('rejects activating a second term while another is ACTIVE', async () => {
@@ -355,11 +391,18 @@ describe('Terms', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch(`/terms/${second.id}/status`)
         .set('Authorization', `Bearer ${token}`)
         .send({ status: 'ACTIVE' })
         .expect(409);
+
+      expect(response.body).toMatchObject({
+        statusCode: 409,
+        errorCode: ErrorCodes.ERR_TERM_ALREADY_ACTIVE,
+        path: `/terms/${second.id}/status`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -441,10 +484,17 @@ describe('Terms', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete(`/terms/${term.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_TERM_DELETE_FAILED,
+        path: `/terms/${term.id}`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

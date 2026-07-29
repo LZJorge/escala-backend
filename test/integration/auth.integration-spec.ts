@@ -7,6 +7,7 @@ import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { AUTH_REPOSITORY } from '@modules/auth/domain/auth.repository';
 import { PrismaServiceMock } from '../utils/mocks/prisma.mock';
 import { RedisServiceMock } from '../utils/mocks/redis.mock';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 const VALID_SALT = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const VALID_PASSWORD = 'password123';
@@ -110,9 +111,11 @@ describe('Auth (e2e)', () => {
         .send({ email: 'nonexistent@test.com', password: VALID_PASSWORD })
         .expect(401);
 
-      expect(response.body.error.message).toContain(
-        'Invalid email or password',
-      );
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.SEC_AUTH_INVALID_CREDENTIALS,
+        statusCode: 401,
+      });
+      expect(response.body.message).toContain('Invalid email or password');
     });
 
     it('returns 401 when password is incorrect', async () => {
@@ -127,9 +130,11 @@ describe('Auth (e2e)', () => {
         .send({ email: 'admin@escala.app', password: 'wrong-password' })
         .expect(401);
 
-      expect(response.body.error.message).toContain(
-        'Invalid email or password',
-      );
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.SEC_AUTH_INVALID_CREDENTIALS,
+        statusCode: 401,
+      });
+      expect(response.body.message).toContain('Invalid email or password');
     });
 
     it('returns 400 when email is empty', async () => {
@@ -138,7 +143,12 @@ describe('Auth (e2e)', () => {
         .send({ email: '', password: VALID_PASSWORD })
         .expect(400);
 
-      expect(response.body.error.code).toBe('BAD_REQUEST');
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+        statusCode: 400,
+      });
+      expect(response.body.details).toBeDefined();
+      expect(Array.isArray(response.body.details)).toBe(true);
     });
   });
 });

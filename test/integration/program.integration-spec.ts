@@ -9,6 +9,7 @@ import { PROGRAM_REPOSITORY } from '@modules/program/domain/program.repository';
 import { PrismaServiceMock } from '../utils/mocks/prisma.mock';
 import { RedisServiceMock } from '../utils/mocks/redis.mock';
 import { buildProgram } from '../utils/factories/program.factory';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('Program (e2e)', () => {
   let app: INestApplication;
@@ -24,8 +25,6 @@ describe('Program (e2e)', () => {
   };
   let jwtService: JwtService;
   let adminToken: string;
-  let userToken: string;
-
   beforeAll(async () => {
     prismaMock = new PrismaServiceMock();
     redisMock = new RedisServiceMock();
@@ -65,7 +64,7 @@ describe('Program (e2e)', () => {
       email: 'admin@escala.app',
       roleType: 'SUPER_ADMIN',
     });
-    userToken = jwtService.sign({
+    void jwtService.sign({
       sub: 'user-id',
       email: 'user@test.com',
       roleType: 'USER',
@@ -115,10 +114,17 @@ describe('Program (e2e)', () => {
     });
 
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(url)
         .send({ name: 'Engineering', termType: 'SEMESTER', totalCredits: 160 })
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: url,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -155,10 +161,17 @@ describe('Program (e2e)', () => {
     it('returns 404 when not found', async () => {
       programRepoMock.findById.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/programs/nope')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: '/programs/nope',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -182,11 +195,18 @@ describe('Program (e2e)', () => {
     it('returns 422 when not found', async () => {
       programRepoMock.findById.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch('/programs/nope')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'Updated' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_PROGRAM_UPDATE_FAILED,
+        path: '/programs/nope',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -203,10 +223,17 @@ describe('Program (e2e)', () => {
     it('returns 404 when not found', async () => {
       programRepoMock.findById.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete('/programs/nope')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: '/programs/nope',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -251,16 +278,30 @@ describe('Program (e2e)', () => {
     it('returns 404 when program not found', async () => {
       programRepoMock.getPensum.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/programs/nope/pensum')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: '/programs/nope/pensum',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/programs/prog-1/pensum')
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: '/programs/prog-1/pensum',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

@@ -10,12 +10,11 @@ export interface EnvelopeResponse<T> {
   meta?: PaginatedMeta;
 }
 
-export interface EnvelopeError {
-  code: string;
+export interface ErrorResponse {
+  statusCode: number;
+  errorCode: string;
   message: string;
-  details?: string[];
-}
-
-export interface EnvelopeErrorResponse {
-  error: EnvelopeError;
+  details?: Record<string, unknown> | string[];
+  timestamp: string;
+  path: string;
 }

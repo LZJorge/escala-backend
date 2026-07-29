@@ -1,16 +1,11 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Body,
-  UnprocessableEntityException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Patch, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { SuperAdmin } from '@modules/auth/infrastructure/decorators/super-admin.decorator';
 import { InstitutionService } from '../application/institution.service';
 import { UpdateInstitutionDto } from '../application/institution.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Institution')
 @Controller()
@@ -30,7 +25,10 @@ export class InstitutionController {
   }> {
     const result = await this.institutionService.get();
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_INSTITUTION_NOT_FOUND,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -49,7 +47,10 @@ export class InstitutionController {
   }> {
     const result = await this.institutionService.update(body);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_INSTITUTION_UPDATE_FAILED,
+        result.error as string,
+      );
     }
     return result.value;
   }

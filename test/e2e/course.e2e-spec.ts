@@ -235,10 +235,9 @@ describe('Courses', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.data).toHaveLength(2);
-      const codes: string[] = response.body.data.map(
-        (c: { code: string }) => c.code,
-      );
+      const data = response.body.data as Array<{ code: string }>;
+      expect(data).toHaveLength(2);
+      const codes = data.map((c) => c.code);
       expect(codes).toEqual(expect.arrayContaining(['MATH101', 'PHY101']));
       expect(codes).not.toContain('ANAT101');
     });

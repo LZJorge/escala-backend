@@ -6,6 +6,7 @@ import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { PrismaServiceMock } from './utils/mocks/prisma.mock';
 import { RedisServiceMock } from './utils/mocks/redis.mock';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('App (smoke)', () => {
   let app: INestApplication;
@@ -37,7 +38,12 @@ describe('App (smoke)', () => {
       .get('/unknown-route')
       .expect(404);
 
-    expect(response.body).toHaveProperty('error');
-    expect(response.body.error).toHaveProperty('code', 'NOT_FOUND');
+    expect(response.body).toMatchObject({
+      statusCode: 404,
+      errorCode: ErrorCodes.ERR_RESOURCE_NOT_FOUND,
+      path: '/unknown-route',
+    });
+    expect(response.body).toHaveProperty('timestamp');
+    expect(response.body).toHaveProperty('message');
   });
 });

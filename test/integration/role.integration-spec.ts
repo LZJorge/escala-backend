@@ -7,6 +7,7 @@ import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { PrismaServiceMock } from '../utils/mocks/prisma.mock';
 import { RedisServiceMock } from '../utils/mocks/redis.mock';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('Role (e2e)', () => {
   let app: INestApplication;
@@ -113,7 +114,7 @@ describe('Role (e2e)', () => {
         },
       ]);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(url)
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
@@ -121,13 +122,27 @@ describe('Role (e2e)', () => {
           permissionCodes: ['course.create', 'nonexistent.code'],
         })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_CREATION_FAILED,
+        path: url,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(url)
         .send({ name: 'Role', permissionCodes: ['course.create'] })
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: url,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -185,10 +200,17 @@ describe('Role (e2e)', () => {
     it('returns 404 when role not found', async () => {
       prismaMock.role.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/roles/non-existent')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_ROLE_NOT_FOUND,
+        path: '/roles/non-existent',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -231,11 +253,18 @@ describe('Role (e2e)', () => {
         isEditable: false,
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch('/roles/built-in-role')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({ name: 'Hacked' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_UPDATE_FAILED,
+        path: '/roles/built-in-role',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -257,10 +286,17 @@ describe('Role (e2e)', () => {
     it('returns 404 when role not found', async () => {
       prismaMock.role.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete('/roles/non-existent')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_ROLE_NOT_FOUND,
+        path: '/roles/non-existent',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 403 when trying to delete a non-editable role', async () => {
@@ -271,10 +307,17 @@ describe('Role (e2e)', () => {
         isEditable: false,
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete('/roles/built-in-role')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.ERR_ROLE_BUILT_IN,
+        path: '/roles/built-in-role',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

@@ -6,9 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  UnprocessableEntityException,
-  NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,6 +21,8 @@ import {
   RoleResponseDto,
 } from '../application/role.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Roles')
 @Controller('roles')
@@ -40,7 +39,10 @@ export class RoleController {
   ): Promise<{ id: string; name: string; permissionCodes: string[] }> {
     const result = await this.roleService.create(body);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_CREATION_FAILED,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -64,7 +66,10 @@ export class RoleController {
   ): Promise<RoleResponseDto> {
     const result = await this.roleService.findById(roleId);
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_NOT_FOUND,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -80,7 +85,10 @@ export class RoleController {
   ): Promise<{ id: string; name: string; permissionCodes: string[] }> {
     const result = await this.roleService.update(roleId, body);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_UPDATE_FAILED,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -97,9 +105,12 @@ export class RoleController {
         typeof result.error === 'string' &&
         result.error.includes('Built-in')
       ) {
-        throw new ForbiddenException(result.error);
+        throw new DomainException(ErrorCodes.ERR_ROLE_BUILT_IN, result.error);
       }
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_NOT_FOUND,
+        result.error as string,
+      );
     }
   }
 }

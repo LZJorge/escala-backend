@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { clearDatabase } from '../utils/prisma.test-utils';
 import { randomBytes, scryptSync } from 'node:crypto';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('Institution', () => {
   let app: INestApplication;
@@ -92,10 +93,17 @@ describe('Institution', () => {
     });
 
     it('returns 401 when no token is provided', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch('/institution')
         .send({ name: 'Hacked University' })
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: '/institution',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 403 when a regular user tries to update', async () => {
@@ -119,11 +127,18 @@ describe('Institution', () => {
 
       const token: string = loginResponse.body.data.accessToken;
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch('/institution')
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Hacked University' })
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_SUPER_ADMIN_REQUIRED,
+        path: '/institution',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

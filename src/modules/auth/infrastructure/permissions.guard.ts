@@ -1,13 +1,10 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { REQUIRED_PERMISSIONS_KEY } from './decorators/require-permissions.decorator';
 import type { AuthenticatedRequest } from './authenticated-request';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -54,7 +51,11 @@ export class PermissionsGuard implements CanActivate {
 
     const hasAll = required.every((p: string) => userPermissionCodes.has(p));
     if (!hasAll) {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new DomainException(
+        ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        'Insufficient permissions',
+        { required },
+      );
     }
 
     return true;

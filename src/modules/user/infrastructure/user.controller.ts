@@ -7,8 +7,6 @@ import {
   Body,
   Param,
   UseGuards,
-  UnprocessableEntityException,
-  NotFoundException,
   Req,
 } from '@nestjs/common';
 import {
@@ -27,6 +25,8 @@ import { UserProfileDto } from '../application/user-profile.dto';
 import { CreateUserDto } from '../application/create-user.dto';
 import { AssignRoleDto } from '../application/assign-role.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -53,7 +53,10 @@ export class UserController {
   }> {
     const result = await this.userService.getMe(request.user);
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_USER_NOT_FOUND,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -69,7 +72,10 @@ export class UserController {
   ): Promise<UserProfileDto> {
     const result = await this.userService.updateProfile(request.user.sub, body);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_USER_UPDATE_FAILED,
+        result.error as string,
+      );
     }
     return result.value;
   }
@@ -86,7 +92,20 @@ export class UserController {
   }> {
     const result = await this.userService.createUser(body);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      const errorMessage = result.error as string;
+      if (errorMessage.includes('Email')) {
+        throw new DomainException(
+          ErrorCodes.ERR_USER_EMAIL_EXISTS,
+          errorMessage,
+        );
+      }
+      if (errorMessage.includes('CI')) {
+        throw new DomainException(ErrorCodes.ERR_USER_CI_EXISTS, errorMessage);
+      }
+      throw new DomainException(
+        ErrorCodes.ERR_USER_CREATION_FAILED,
+        errorMessage,
+      );
     }
     return result.value;
   }
@@ -98,7 +117,10 @@ export class UserController {
   public async delete(@Param('userId') userId: string): Promise<void> {
     const result = await this.userService.softDelete(userId);
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_USER_NOT_FOUND,
+        result.error as string,
+      );
     }
   }
 
@@ -112,7 +134,10 @@ export class UserController {
   ): Promise<void> {
     const result = await this.roleService.assignRole(userId, body.roleId);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        result.error as string,
+      );
     }
   }
 
@@ -126,7 +151,10 @@ export class UserController {
   ): Promise<void> {
     const result = await this.roleService.unassignRole(userId, roleId);
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        result.error as string,
+      );
     }
   }
 }

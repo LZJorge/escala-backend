@@ -140,19 +140,25 @@ describe('Programs', () => {
         totalCredits: 120,
       });
 
-      expect(response.body.data.courses).toHaveLength(2);
+      const courses = response.body.data.courses as Array<{
+        code: string;
+        credits: number;
+        termLevel: number;
+        prerequisites: Array<{
+          requiredCourseId: string;
+          requiredCredits: number | null;
+        }>;
+      }>;
 
-      const cs101 = response.body.data.courses.find(
-        (c: { code: string }) => c.code === 'CS101',
-      );
+      expect(courses).toHaveLength(2);
+
+      const cs101 = courses.find((c) => c.code === 'CS101');
       expect(cs101).toMatchObject({ credits: 4, termLevel: 1 });
-      expect(cs101.prerequisites).toEqual([]);
+      expect(cs101!.prerequisites).toEqual([]);
 
-      const cs201 = response.body.data.courses.find(
-        (c: { code: string }) => c.code === 'CS201',
-      );
+      const cs201 = courses.find((c) => c.code === 'CS201');
       expect(cs201).toMatchObject({ credits: 4, termLevel: 2 });
-      expect(cs201.prerequisites).toEqual([
+      expect(cs201!.prerequisites).toEqual([
         { requiredCourseId: courseA.id, requiredCredits: null },
       ]);
     });

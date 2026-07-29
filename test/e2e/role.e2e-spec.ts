@@ -5,6 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { clearDatabase } from '../utils/prisma.test-utils';
 import { randomBytes, scryptSync } from 'node:crypto';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 async function loginWithPermissions(
   app: INestApplication,
@@ -151,7 +152,7 @@ describe('Roles', () => {
       const permB = await prisma.permission.create({
         data: { code: 'course.update', module: 'course', description: 'b' },
       });
-      const permC = await prisma.permission.create({
+      await prisma.permission.create({
         data: { code: 'course.delete', module: 'course', description: 'c' },
       });
 
@@ -192,11 +193,18 @@ describe('Roles', () => {
         data: { name: 'System Role', isEditable: false },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch(`/roles/${role.id}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Hacked' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_UPDATE_FAILED,
+        path: `/roles/${role.id}`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -213,10 +221,17 @@ describe('Roles', () => {
         data: { name: 'System Default', isEditable: false },
       });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete(`/roles/${role.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.ERR_ROLE_BUILT_IN,
+        path: `/roles/${role.id}`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

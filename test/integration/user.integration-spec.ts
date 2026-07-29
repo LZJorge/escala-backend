@@ -9,6 +9,7 @@ import { USER_REPOSITORY } from '@modules/user/domain/user.repository';
 import { PrismaServiceMock } from '../utils/mocks/prisma.mock';
 import { RedisServiceMock } from '../utils/mocks/redis.mock';
 import { buildUser } from '../utils/factories/user.factory';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 describe('User (e2e)', () => {
   let app: INestApplication;
@@ -119,14 +120,30 @@ describe('User (e2e)', () => {
     it('returns 404 when user is not found', async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/users/me')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_USER_NOT_FOUND,
+        path: '/users/me',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 401 when no token is provided', async () => {
-      await request(app.getHttpServer()).get('/users/me').expect(401);
+      const response = await request(app.getHttpServer())
+        .get('/users/me')
+        .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: '/users/me',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -153,10 +170,17 @@ describe('User (e2e)', () => {
     it('returns 404 when super admin is not found', async () => {
       prismaMock.superAdmin.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get('/users/me')
         .set('Authorization', `Bearer ${superAdminToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_USER_NOT_FOUND,
+        path: '/users/me',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -178,11 +202,18 @@ describe('User (e2e)', () => {
     it('returns 422 when user is not found for update', async () => {
       userRepositoryMock.findById.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .patch('/users/me')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({ firstName: 'New' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_USER_UPDATE_FAILED,
+        path: '/users/me',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -233,11 +264,18 @@ describe('User (e2e)', () => {
       );
       userRepositoryMock.findByCi.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(createUrl)
         .set('Authorization', `Bearer ${regularToken}`)
         .send(validPayload)
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
+        path: createUrl,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 403 without user.create permission', async () => {
@@ -249,18 +287,32 @@ describe('User (e2e)', () => {
         },
       ]);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(createUrl)
         .set('Authorization', `Bearer ${regularToken}`)
         .send(validPayload)
         .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: createUrl,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
 
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(createUrl)
         .send(validPayload)
         .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: createUrl,
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -294,10 +346,17 @@ describe('User (e2e)', () => {
 
       userRepositoryMock.findById.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete('/users/non-existent')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_USER_NOT_FOUND,
+        path: '/users/non-existent',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -338,11 +397,18 @@ describe('User (e2e)', () => {
 
       prismaMock.role.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/users/user-id/roles')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({ roleId: 'nonexistent' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        path: '/users/user-id/roles',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 
@@ -381,11 +447,18 @@ describe('User (e2e)', () => {
 
       prismaMock.role.findUnique.mockResolvedValue(null);
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .delete('/users/user-id/roles/nonexistent')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({ roleId: 'nonexistent' })
         .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        path: '/users/user-id/roles/nonexistent',
+      });
+      expect(response.body).toHaveProperty('timestamp');
     });
   });
 });

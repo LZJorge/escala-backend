@@ -7,9 +7,6 @@ import {
   Body,
   Param,
   Query,
-  UnprocessableEntityException,
-  NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +24,8 @@ import {
   TermResponseDto,
 } from '../application/term.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { DomainException } from '@core/domain/domain.exception';
+import { ErrorCodes } from '@core/domain/error-codes';
 
 @ApiTags('Terms')
 @Controller('terms')
@@ -42,7 +41,10 @@ export class TermController {
     const result = await this.service.create(body);
 
     if (result.isFailure) {
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_CREATION_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -84,7 +86,10 @@ export class TermController {
     const result = await this.service.findById(id);
 
     if (result.isFailure) {
-      throw new NotFoundException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_NOT_FOUND,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -105,10 +110,13 @@ export class TermController {
 
     if (result.isFailure) {
       if (result.error === 'Term not found') {
-        throw new NotFoundException(result.error);
+        throw new DomainException(ErrorCodes.ERR_TERM_NOT_FOUND, result.error);
       }
 
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_UPDATE_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -127,15 +135,20 @@ export class TermController {
 
     if (result.isFailure) {
       if (result.error === 'Term not found') {
-        throw new NotFoundException(result.error);
+        throw new DomainException(ErrorCodes.ERR_TERM_NOT_FOUND, result.error);
       }
 
       if (result.error === 'Another term is already active') {
-        throw new ConflictException(result.error);
+        throw new DomainException(
+          ErrorCodes.ERR_TERM_ALREADY_ACTIVE,
+          result.error,
+        );
       }
 
-      // ponytail: invalid transitions become 422
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_CLOSE_FAILED,
+        result.error as string,
+      );
     }
 
     return result.value;
@@ -151,10 +164,13 @@ export class TermController {
 
     if (result.isFailure) {
       if (result.error === 'Term not found') {
-        throw new NotFoundException(result.error);
+        throw new DomainException(ErrorCodes.ERR_TERM_NOT_FOUND, result.error);
       }
 
-      throw new UnprocessableEntityException(result.error);
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_DELETE_FAILED,
+        result.error as string,
+      );
     }
   }
 }
