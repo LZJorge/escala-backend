@@ -66,6 +66,7 @@ describe('Institution', () => {
         data: {
           email: 'admin@test.edu',
           password: `${salt}:${hash}`,
+          mustChangePassword: false,
         },
       });
 

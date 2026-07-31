@@ -39,7 +39,38 @@ export class PrismaAuthRepository implements AuthRepository {
     return {
       id: record.id,
       email: record.email,
+      mustChangePassword: record.mustChangePassword,
       password: record.password,
     };
+  }
+
+  public async findSuperAdminById(
+    id: string,
+  ): Promise<SuperAdminRecord | null> {
+    const record = await this.prisma.superAdmin.findUnique({
+      where: { id },
+    });
+    if (!record) {
+      return null;
+    }
+    return {
+      id: record.id,
+      email: record.email,
+      mustChangePassword: record.mustChangePassword,
+      password: record.password,
+    };
+  }
+
+  public async changeSuperAdminPassword(
+    id: string,
+    password: string,
+  ): Promise<void> {
+    await this.prisma.superAdmin.update({
+      where: { id },
+      data: {
+        password,
+        mustChangePassword: false,
+      },
+    });
   }
 }

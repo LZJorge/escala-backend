@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Result } from '@core/domain/result';
 import { AUTH_REPOSITORY } from '../domain/auth.repository';
 import type { AuthRepository } from '../domain/auth.repository';
@@ -21,6 +21,7 @@ export class AuthService {
         email: string;
         firstName: string;
         lastName: string;
+        mustChangePassword: boolean;
         roleType: 'SUPER_ADMIN' | 'USER';
       };
     }>
@@ -48,6 +49,7 @@ export class AuthService {
       const jwtPayload: Record<string, unknown> = {
         sub: superAdmin.id,
         email: superAdmin.email,
+        mustChangePassword: superAdmin.mustChangePassword,
         roleType: 'SUPER_ADMIN',
       };
 
@@ -60,6 +62,7 @@ export class AuthService {
           email: superAdmin.email,
           firstName: '',
           lastName: '',
+          mustChangePassword: superAdmin.mustChangePassword,
           roleType: 'SUPER_ADMIN',
         },
       });
@@ -85,6 +88,7 @@ export class AuthService {
     const jwtPayload: Record<string, unknown> = {
       sub: user.id,
       email: user.email,
+      mustChangePassword: false,
       roleType: 'USER',
     };
 
@@ -97,7 +101,53 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        mustChangePassword: false,
         roleType: 'USER',
+      },
+    });
+  }
+
+  public async changeSuperAdminPassword(
+    id: string,
+    newPassword: string,
+  ): Promise<
+    Result<{
+      accessToken: string;
+      user: {
+        id: string;
+        email: string;
+        mustChangePassword: boolean;
+        roleType: 'SUPER_ADMIN';
+      };
+    }>
+  > {
+    const superadmin = await this.authRepository.findSuperAdminById(id);
+    if (!superadmin) {
+      return Result.fail('Super admin not found');
+    }
+
+    const salt = randomBytes(16).toString('hex');
+    const hashBuf = scryptSync(newPassword, salt, 64);
+    const hashedPassword = `${salt}:${hashBuf.toString('hex')}`;
+
+    await this.authRepository.changeSuperAdminPassword(id, hashedPassword);
+
+    const jwtPayload = {
+      sub: superadmin.id,
+      email: superadmin.email,
+      mustChangePassword: false,
+      roleType: 'SUPER_ADMIN',
+    };
+
+    const accessToken = this.jwtService.sign(jwtPayload);
+
+    return Result.ok({
+      accessToken,
+      user: {
+        id: superadmin.id,
+        email: superadmin.email,
+        mustChangePassword: false,
+        roleType: 'SUPER_ADMIN',
       },
     });
   }

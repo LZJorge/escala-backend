@@ -21,6 +21,8 @@ describe('Auth (e2e)', () => {
   let authRepositoryMock: {
     findByEmail: jest.Mock;
     findSuperAdminByEmail: jest.Mock;
+    findSuperAdminById: jest.Mock;
+    changeSuperAdminPassword: jest.Mock;
   };
 
   beforeAll(async () => {
@@ -29,6 +31,8 @@ describe('Auth (e2e)', () => {
     authRepositoryMock = {
       findByEmail: jest.fn(),
       findSuperAdminByEmail: jest.fn(),
+      findSuperAdminById: jest.fn(),
+      changeSuperAdminPassword: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -69,6 +73,7 @@ describe('Auth (e2e)', () => {
         id: 'super-admin-id',
         email: 'admin@escala.app',
         password: `${VALID_SALT}:${VALID_HASH}`,
+        mustChangePassword: true,
       });
       authRepositoryMock.findByEmail.mockResolvedValue(null);
 
@@ -79,6 +84,7 @@ describe('Auth (e2e)', () => {
 
       expect(response.body.data).toHaveProperty('accessToken');
       expect(response.body.data.user.roleType).toBe('SUPER_ADMIN');
+      expect(response.body.data.user.mustChangePassword).toBe(true);
     });
 
     it('returns 200 with JWT for valid regular user credentials', async () => {
@@ -123,6 +129,7 @@ describe('Auth (e2e)', () => {
         id: 'super-admin-id',
         email: 'admin@escala.app',
         password: `${VALID_SALT}:${VALID_HASH}`,
+        mustChangePassword: true,
       });
 
       const response = await request(app.getHttpServer())
@@ -149,6 +156,135 @@ describe('Auth (e2e)', () => {
       });
       expect(response.body.details).toBeDefined();
       expect(Array.isArray(response.body.details)).toBe(true);
+    });
+  });
+
+  describe('superadmin password change flow', () => {
+    const loginAsSuperAdmin = async (): Promise<string> => {
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+        password: `${VALID_SALT}:${VALID_HASH}`,
+        mustChangePassword: true,
+      });
+      authRepositoryMock.findByEmail.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'admin@escala.app', password: VALID_PASSWORD })
+        .expect(200);
+      return response.body.data.accessToken as string;
+    };
+
+    const seedInstitution = (): void => {
+      prismaMock.institution.findFirst.mockResolvedValue({
+        id: 'inst-id',
+        name: 'Test University',
+        contactEmail: null,
+        websiteUrl: null,
+        logoUrl: null,
+      });
+      prismaMock.institution.update.mockResolvedValue({
+        id: 'inst-id',
+        name: 'Updated University',
+        contactEmail: null,
+        websiteUrl: null,
+        logoUrl: null,
+      });
+    };
+
+    it('blocks a must-change token on protected endpoints', async () => {
+      const token = await loginAsSuperAdmin();
+
+      const response = await request(app.getHttpServer())
+        .patch('/institution')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Hacked University' })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.SEC_AUTH_PASSWORD_CHANGE_REQUIRED,
+      });
+      expect(prismaMock.institution.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('blocks a must-change token even on non-super-admin endpoints', async () => {
+      const token = await loginAsSuperAdmin();
+
+      const response = await request(app.getHttpServer())
+        .get('/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.SEC_AUTH_PASSWORD_CHANGE_REQUIRED,
+      });
+    });
+
+    it('changes the password and returns a usable must-change-free token', async () => {
+      const token = await loginAsSuperAdmin();
+      seedInstitution();
+
+      authRepositoryMock.findSuperAdminById.mockResolvedValue({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+        password: `${VALID_SALT}:${VALID_HASH}`,
+        mustChangePassword: true,
+      });
+      authRepositoryMock.changeSuperAdminPassword.mockResolvedValue(undefined);
+
+      const changeResponse = await request(app.getHttpServer())
+        .post('/auth/change-superadmin-password')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ newPassword: 'NewPass456!' })
+        .expect(200);
+
+      expect(changeResponse.body.data.user.mustChangePassword).toBe(false);
+      expect(changeResponse.body.data.accessToken).toBeDefined();
+      expect(authRepositoryMock.changeSuperAdminPassword).toHaveBeenCalledWith(
+        'super-admin-id',
+        expect.stringMatching(/^[a-f0-9]{32}:[a-f0-9]{128}$/),
+      );
+
+      const newToken: string = changeResponse.body.data.accessToken;
+
+      const accessResponse = await request(app.getHttpServer())
+        .patch('/institution')
+        .set('Authorization', `Bearer ${newToken}`)
+        .send({ name: 'Updated University' })
+        .expect(200);
+
+      expect(accessResponse.body.data.name).toBe('Updated University');
+    });
+
+    it('allows a superadmin with mustChangePassword false through the guard', async () => {
+      authRepositoryMock.findSuperAdminByEmail.mockResolvedValue({
+        id: 'super-admin-id',
+        email: 'admin@escala.app',
+        password: `${VALID_SALT}:${VALID_HASH}`,
+        mustChangePassword: false,
+      });
+      authRepositoryMock.findByEmail.mockResolvedValue(null);
+      seedInstitution();
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'admin@escala.app', password: VALID_PASSWORD })
+        .expect(200);
+
+      expect(loginResponse.body.data.user.mustChangePassword).toBe(false);
+
+      const token: string = loginResponse.body.data.accessToken;
+
+      const response = await request(app.getHttpServer())
+        .patch('/institution')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Updated University' })
+        .expect(200);
+
+      expect(response.body.data.name).toBe('Updated University');
     });
   });
 });
