@@ -159,7 +159,9 @@ export class TermController {
   @ApiOperation({ summary: 'Soft delete an upcoming term' })
   @ApiOkResponse({ description: 'Term deleted' })
   @ApiErrors(401, 403, 404, 422)
-  public async delete(@Param('id') id: string): Promise<void> {
+  public async delete(
+    @Param('id') id: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.service.delete(id);
 
     if (result.isFailure) {
@@ -172,5 +174,6 @@ export class TermController {
         result.error as string,
       );
     }
+    return { deletedId: id, message: 'Term deleted successfully' };
   }
 }

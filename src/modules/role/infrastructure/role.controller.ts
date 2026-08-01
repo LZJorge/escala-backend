@@ -117,7 +117,9 @@ export class RoleController {
   @ApiOperation({ summary: 'Delete a custom role' })
   @ApiOkResponse({ description: 'Role deleted' })
   @ApiErrors(401, 403, 404, 422)
-  public async delete(@Param('roleId') roleId: string): Promise<void> {
+  public async delete(
+    @Param('roleId') roleId: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.roleService.delete(roleId);
     if (result.isFailure) {
       if (
@@ -131,5 +133,6 @@ export class RoleController {
         result.error as string,
       );
     }
+    return { deletedId: roleId, message: 'Role deleted successfully' };
   }
 }

@@ -110,7 +110,9 @@ export class CourseController {
   @ApiOperation({ summary: 'Soft delete a course' })
   @ApiOkResponse({ description: 'Course deleted' })
   @ApiErrors(401, 403, 404, 422)
-  public async delete(@Param('courseId') courseId: string): Promise<void> {
+  public async delete(
+    @Param('courseId') courseId: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.service.delete(courseId);
 
     if (result.isFailure) {
@@ -125,6 +127,7 @@ export class CourseController {
         result.error as string,
       );
     }
+    return { deletedId: courseId, message: 'Course deleted successfully' };
   }
 
   @Put(':courseId/prerequisites')
@@ -135,7 +138,7 @@ export class CourseController {
   public async setPrerequisites(
     @Param('courseId') courseId: string,
     @Body() body: SetPrerequisitesDto,
-  ): Promise<void> {
+  ): Promise<{ courseId: string; prerequisiteCount: number }> {
     const mapped = body.prerequisites.map((p: PrerequisiteEntryDto) => ({
       requiredCourseId: p.requiredCourseId ?? null,
       requiredCredits: p.requiredCredits ?? null,
@@ -148,5 +151,6 @@ export class CourseController {
         result.error as string,
       );
     }
+    return { courseId, prerequisiteCount: mapped.length };
   }
 }

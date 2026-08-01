@@ -128,7 +128,9 @@ export class ProgramController {
   @ApiOperation({ summary: 'Soft delete a program' })
   @ApiOkResponse({ description: 'Program deleted' })
   @ApiErrors(401, 403, 404, 422)
-  public async delete(@Param('programId') programId: string): Promise<void> {
+  public async delete(
+    @Param('programId') programId: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.service.delete(programId);
 
     if (result.isFailure) {
@@ -143,5 +145,6 @@ export class ProgramController {
         result.error as string,
       );
     }
+    return { deletedId: programId, message: 'Program deleted successfully' };
   }
 }

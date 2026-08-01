@@ -217,7 +217,13 @@ describe('Program (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/programs/prog-1')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { deletedId?: string; message?: string } }) => {
+          expect(res.body.data).toMatchObject({
+            deletedId: 'prog-1',
+            message: 'Program deleted successfully',
+          });
+        });
     });
 
     it('returns 404 when not found', async () => {

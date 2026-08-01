@@ -399,7 +399,13 @@ describe('Section (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/sections/sec-1')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { deletedId?: string; message?: string } }) => {
+          expect(res.body.data).toMatchObject({
+            deletedId: 'sec-1',
+            message: 'Section deleted successfully',
+          });
+        });
     });
 
     it('returns 409 when section has enrollments', async () => {
@@ -545,7 +551,18 @@ describe('Section (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/sections/sec-1/schedules/sch-1')
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .expect(200)
+        .expect(
+          (res: {
+            body: { sectionId?: string; deletedId?: string; message?: string };
+          }) => {
+            expect(res.body.data).toMatchObject({
+              sectionId: 'sec-1',
+              deletedId: 'sch-1',
+              message: 'Schedule deleted successfully',
+            });
+          },
+        );
     });
 
     it('returns 404 when section not found', async () => {

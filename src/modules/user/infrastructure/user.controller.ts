@@ -168,7 +168,9 @@ export class UserController {
   @RequirePermission('user.delete')
   @ApiOperation({ summary: 'Soft delete a user (preserves academic history)' })
   @ApiErrors(401, 403, 404)
-  public async delete(@Param('userId') userId: string): Promise<void> {
+  public async delete(
+    @Param('userId') userId: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.userService.softDelete(userId);
     if (result.isFailure) {
       throw new DomainException(
@@ -176,6 +178,7 @@ export class UserController {
         result.error as string,
       );
     }
+    return { deletedId: userId, message: 'User deleted successfully' };
   }
 
   @Post(':userId/roles')
@@ -185,7 +188,7 @@ export class UserController {
   public async assignRole(
     @Param('userId') userId: string,
     @Body() body: AssignRoleDto,
-  ): Promise<void> {
+  ): Promise<{ userId: string; roleId: string }> {
     const result = await this.roleService.assignRole(userId, body.roleId);
     if (result.isFailure) {
       throw new DomainException(
@@ -193,6 +196,7 @@ export class UserController {
         result.error as string,
       );
     }
+    return { userId, roleId: body.roleId };
   }
 
   @Delete(':userId/roles/:roleId')
@@ -202,7 +206,7 @@ export class UserController {
   public async unassignRole(
     @Param('userId') userId: string,
     @Param('roleId') roleId: string,
-  ): Promise<void> {
+  ): Promise<{ userId: string; roleId: string }> {
     const result = await this.roleService.unassignRole(userId, roleId);
     if (result.isFailure) {
       throw new DomainException(
@@ -210,5 +214,6 @@ export class UserController {
         result.error as string,
       );
     }
+    return { userId, roleId };
   }
 }

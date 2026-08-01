@@ -133,7 +133,9 @@ export class SectionController {
   })
   @ApiOkResponse({ description: 'Section deleted' })
   @ApiErrors(401, 403, 404, 409, 422)
-  public async delete(@Param('id') id: string): Promise<void> {
+  public async delete(
+    @Param('id') id: string,
+  ): Promise<{ deletedId: string; message: string }> {
     const result = await this.service.delete(id);
 
     if (result.isFailure) {
@@ -156,6 +158,7 @@ export class SectionController {
         result.error as string,
       );
     }
+    return { deletedId: id, message: 'Section deleted successfully' };
   }
 
   @Post(':id/schedules')
@@ -194,7 +197,7 @@ export class SectionController {
   public async deleteSchedule(
     @Param('id') id: string,
     @Param('scheduleId') scheduleId: string,
-  ): Promise<void> {
+  ): Promise<{ sectionId: string; deletedId: string; message: string }> {
     const result = await this.service.deleteSchedule(id, scheduleId);
 
     if (result.isFailure) {
@@ -203,5 +206,10 @@ export class SectionController {
         result.error as string,
       );
     }
+    return {
+      sectionId: id,
+      deletedId: scheduleId,
+      message: 'Schedule deleted successfully',
+    };
   }
 }

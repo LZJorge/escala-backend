@@ -352,7 +352,13 @@ describe('Role (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/roles/custom-role')
         .set('Authorization', `Bearer ${regularToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { deletedId?: string; message?: string } }) => {
+          expect(res.body.data).toMatchObject({
+            deletedId: 'custom-role',
+            message: 'Role deleted successfully',
+          });
+        });
     });
 
     it('returns 404 when role not found', async () => {

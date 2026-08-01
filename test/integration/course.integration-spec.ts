@@ -239,7 +239,13 @@ describe('Course (e2e)', () => {
       await request(app.getHttpServer())
         .delete(`/courses/${COURSE_UUID}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { deletedId?: string; message?: string } }) => {
+          expect(res.body.data).toMatchObject({
+            deletedId: COURSE_UUID,
+            message: 'Course deleted successfully',
+          });
+        });
     });
 
     it('returns 404 when not found', async () => {
@@ -262,7 +268,17 @@ describe('Course (e2e)', () => {
         .put(url)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ prerequisites: [{ requiredCourseId: COURSE_UUID }] })
-        .expect(200);
+        .expect(200)
+        .expect(
+          (res: {
+            body: { courseId?: string; prerequisiteCount?: number };
+          }) => {
+            expect(res.body.data).toEqual({
+              courseId: COURSE_UUID,
+              prerequisiteCount: 1,
+            });
+          },
+        );
     });
 
     it('returns 401 without token', async () => {

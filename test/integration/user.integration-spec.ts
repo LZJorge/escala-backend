@@ -577,7 +577,13 @@ describe('User (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/users/test-user-id')
         .set('Authorization', `Bearer ${regularToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { deletedId?: string; message?: string } }) => {
+          expect(res.body.data).toMatchObject({
+            deletedId: 'test-user-id',
+            message: 'User deleted successfully',
+          });
+        });
     });
 
     it('returns 404 when user not found', async () => {
@@ -693,7 +699,13 @@ describe('User (e2e)', () => {
       await request(app.getHttpServer())
         .delete('/users/user-id/roles/role-id')
         .set('Authorization', `Bearer ${regularToken}`)
-        .expect(200);
+        .expect(200)
+        .expect((res: { body: { userId?: string; roleId?: string } }) => {
+          expect(res.body.data).toEqual({
+            userId: 'user-id',
+            roleId: 'role-id',
+          });
+        });
     });
 
     it('returns 422 when role not found', async () => {
