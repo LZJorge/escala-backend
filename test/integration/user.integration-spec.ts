@@ -257,6 +257,164 @@ describe('User (e2e)', () => {
         path: '/users',
       });
     });
+
+    it('passes profile, role and active filters to the repository', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.read' } },
+              { permission: { code: 'student.read' } },
+            ],
+          },
+        },
+      ]);
+      userRepositoryMock.findAll.mockResolvedValue([]);
+      userRepositoryMock.count.mockResolvedValue(0);
+
+      await request(app.getHttpServer())
+        .get('/users')
+        .query({
+          profile: 'STUDENT',
+          roleId: 'role-1',
+          isActive: 'false',
+          enrollmentYear: '2026',
+        })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(userRepositoryMock.findAll).toHaveBeenCalledWith({
+        skip: 0,
+        take: 20,
+        profile: 'STUDENT',
+        roleId: 'role-1',
+        isActive: false,
+        enrollmentYear: 2026,
+      });
+      expect(userRepositoryMock.count).toHaveBeenCalledWith({
+        profile: 'STUDENT',
+        roleId: 'role-1',
+        isActive: false,
+        enrollmentYear: 2026,
+      });
+    });
+
+    it('passes text search and date range to the repository', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.read' } }],
+          },
+        },
+      ]);
+      userRepositoryMock.findAll.mockResolvedValue([]);
+      userRepositoryMock.count.mockResolvedValue(0);
+
+      await request(app.getHttpServer())
+        .get('/users')
+        .query({
+          q: 'juan',
+          profile: 'NONE',
+          createdFrom: '2026-01-01T00:00:00.000Z',
+        })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(userRepositoryMock.findAll).toHaveBeenCalledWith({
+        skip: 0,
+        take: 20,
+        q: 'juan',
+        profile: 'NONE',
+        createdFrom: new Date('2026-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('rejects an invalid profile filter with 400', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.read' } }],
+          },
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .query({ profile: 'TEACHER' })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+      });
+    });
+
+    it('requires student.read to filter by students', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.read' } }],
+          },
+        },
+      ]);
+      userRepositoryMock.findAll.mockResolvedValue([]);
+      userRepositoryMock.count.mockResolvedValue(0);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .query({ profile: 'STUDENT' })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        details: { required: 'student.read' },
+      });
+      expect(userRepositoryMock.findAll).not.toHaveBeenCalled();
+    });
+
+    it('allows filtering by students with student.read only', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'student.read' } }],
+          },
+        },
+      ]);
+      userRepositoryMock.findAll.mockResolvedValue([]);
+      userRepositoryMock.count.mockResolvedValue(0);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .query({ profile: 'STUDENT' })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(response.body.meta.total).toBe(0);
+    });
+
+    it('requires user.read to list users without a student filter', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'student.read' } }],
+          },
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        details: { required: 'user.read' },
+      });
+    });
   });
 
   describe('PATCH /users/me', () => {
@@ -300,6 +458,7 @@ describe('User (e2e)', () => {
       firstName: 'New',
       lastName: 'User',
       ci: '87654321',
+      profiles: ['STUDENT'],
     };
 
     it('returns 201 when user is created', async () => {
@@ -317,6 +476,9 @@ describe('User (e2e)', () => {
       userRepositoryMock.findByEmail.mockResolvedValue(null);
       userRepositoryMock.findByCi.mockResolvedValue(null);
       userRepositoryMock.save.mockResolvedValue(undefined);
+      prismaMock.studentProfile.create.mockResolvedValue({
+        id: 'student-profile-id',
+      });
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -418,7 +580,7 @@ describe('User (e2e)', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
-    it('creates user with roles and returns them', async () => {
+    it('creates a user with a STUDENT profile', async () => {
       prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
@@ -433,30 +595,26 @@ describe('User (e2e)', () => {
       userRepositoryMock.findByEmail.mockResolvedValue(null);
       userRepositoryMock.findByCi.mockResolvedValue(null);
       userRepositoryMock.save.mockResolvedValue(undefined);
-      prismaMock.role.findMany.mockResolvedValue([
-        { id: 'role-1', name: 'Editor' },
-      ]);
-      prismaMock.adminProfile.create.mockResolvedValue({
-        id: 'admin-profile-id',
+      prismaMock.studentProfile.create.mockResolvedValue({
+        id: 'student-profile-id',
       });
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
         .set('Authorization', `Bearer ${regularToken}`)
-        .send({ ...validPayload, roleIds: ['role-1'] })
+        .send({ ...validPayload, profiles: ['STUDENT'] })
         .expect(201);
 
-      expect(response.body.data.roles).toEqual(['Editor']);
-      expect(response.body.data.profiles).toEqual(['ADMIN']);
-      expect(prismaMock.adminProfile.create).toHaveBeenCalledWith({
-        data: {
-          userId: expect.any(String),
-          roles: { create: [{ roleId: 'role-1' }] },
-        },
+      expect(response.body.data.profiles).toEqual(['STUDENT']);
+      expect(response.body.data.studentProfileId).toBe('student-profile-id');
+      expect(response.body.data.adminProfileId).toBeNull();
+      expect(prismaMock.adminProfile.create).not.toHaveBeenCalled();
+      expect(prismaMock.studentProfile.create).toHaveBeenCalledWith({
+        data: { userId: expect.any(String) },
       });
     });
 
-    it('returns 422 when a role ID is invalid', async () => {
+    it('creates a user with an ADMIN profile', async () => {
       prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
@@ -470,21 +628,85 @@ describe('User (e2e)', () => {
 
       userRepositoryMock.findByEmail.mockResolvedValue(null);
       userRepositoryMock.findByCi.mockResolvedValue(null);
-      prismaMock.role.findMany.mockResolvedValue([
-        { id: 'role-1', name: 'Editor' },
-      ]);
+      userRepositoryMock.save.mockResolvedValue(undefined);
+      prismaMock.adminProfile.create.mockResolvedValue({
+        id: 'admin-profile-id',
+      });
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
         .set('Authorization', `Bearer ${regularToken}`)
-        .send({ ...validPayload, roleIds: ['role-1', 'nonexistent'] })
-        .expect(422);
+        .send({ ...validPayload, profiles: ['ADMIN'] })
+        .expect(201);
+
+      expect(response.body.data.profiles).toEqual(['ADMIN']);
+      expect(response.body.data.adminProfileId).toBe('admin-profile-id');
+      expect(response.body.data.roles).toEqual([]);
+      expect(prismaMock.studentProfile.create).not.toHaveBeenCalled();
+      expect(prismaMock.adminProfile.create).toHaveBeenCalledWith({
+        data: { userId: expect.any(String) },
+      });
+    });
+
+    it('creates a user with both profiles', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      userRepositoryMock.save.mockResolvedValue(undefined);
+      prismaMock.adminProfile.create.mockResolvedValue({
+        id: 'admin-profile-id',
+      });
+      prismaMock.studentProfile.create.mockResolvedValue({
+        id: 'student-profile-id',
+      });
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ ...validPayload, profiles: ['ADMIN', 'STUDENT'] })
+        .expect(201);
+
+      expect(response.body.data.profiles).toEqual(['ADMIN', 'STUDENT']);
+      expect(response.body.data.adminProfileId).toBe('admin-profile-id');
+      expect(response.body.data.studentProfileId).toBe('student-profile-id');
+    });
+
+    it('rejects a user without any profile with 422', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      const { profiles: _profiles, ...payloadWithoutProfiles } = validPayload;
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(payloadWithoutProfiles)
+        .expect(400);
 
       expect(response.body).toMatchObject({
-        statusCode: 422,
-        errorCode: ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
         path: createUrl,
       });
+      expect(userRepositoryMock.save).not.toHaveBeenCalled();
     });
   });
 

@@ -5,12 +5,14 @@ import { UserController } from './user.controller';
 import { UserService } from '../application/user.service';
 import { PrismaUserRepository } from './user.repository.impl';
 import { USER_REPOSITORY } from '../domain/user.repository';
+import { UserListGuard } from './user-list.guard';
 
 @Module({
   imports: [AuthModule, RoleModule],
   controllers: [UserController],
   providers: [
     UserService,
+    UserListGuard,
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
   ],
 })

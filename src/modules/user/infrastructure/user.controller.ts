@@ -25,12 +25,13 @@ import { UpdateProfileDto } from '../application/update-profile.dto';
 import { UserProfileDto } from '../application/user-profile.dto';
 import { CreateUserDto } from '../application/create-user.dto';
 import { AssignRoleDto } from '../application/assign-role.dto';
-import { UserListItem } from '../domain/user.repository';
+import { UserListItem, UserListFilter } from '../domain/user.repository';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
-import { PaginationDto } from '@core/infrastructure/http/pagination.dto';
 import { Page } from '@core/domain/page';
 import { DomainException } from '@core/domain/domain.exception';
 import { ErrorCodes } from '@core/domain/error-codes';
+import { UserQueryDto } from '../application/user-query.dto';
+import { UserListGuard } from './user-list.guard';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -42,16 +43,36 @@ export class UserController {
   ) {}
 
   @Get()
-  @RequirePermission('user.read')
+  @UseGuards(JwtAuthGuard, UserListGuard)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'List institution users with their roles (paginated)',
+    summary:
+      'List users (paginated). Requires user.read, or student.read when filtering by students (profile=STUDENT or enrollmentYear)',
   })
   @ApiOkResponse({ description: 'Paginated users with their roles' })
   @ApiErrors(401, 403)
   public async findAll(
-    @Query() query: PaginationDto,
+    @Query() query: UserQueryDto,
   ): Promise<Page<UserListItem>> {
-    const result = await this.userService.findAllUsers(query);
+    const filter: UserListFilter = {
+      q: query.q,
+      profile: query.profile,
+      isActive:
+        query.isActive === undefined ? undefined : query.isActive === 'true',
+      roleId: query.roleId,
+      enrollmentYear: query.enrollmentYear,
+      createdFrom:
+        query.createdFrom === undefined
+          ? undefined
+          : new Date(query.createdFrom),
+      createdTo:
+        query.createdTo === undefined ? undefined : new Date(query.createdTo),
+    };
+    const result = await this.userService.findAllUsers({
+      page: query.page,
+      pageSize: query.pageSize,
+      filter,
+    });
     return result.value;
   }
 
@@ -149,12 +170,6 @@ export class UserController {
       }
       if (errorMessage.includes('CI')) {
         throw new DomainException(ErrorCodes.ERR_USER_CI_EXISTS, errorMessage);
-      }
-      if (errorMessage.includes('role IDs')) {
-        throw new DomainException(
-          ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
-          errorMessage,
-        );
       }
       throw new DomainException(
         ErrorCodes.ERR_USER_CREATION_FAILED,

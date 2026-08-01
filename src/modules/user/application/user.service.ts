@@ -5,7 +5,11 @@ import { Result } from '@core/domain/result';
 import { Page } from '@core/domain/page';
 import { User } from '@core/domain/user.entity';
 import { USER_REPOSITORY } from '../domain/user.repository';
-import type { UserRepository, UserListItem } from '../domain/user.repository';
+import type {
+  UserListFilter,
+  UserRepository,
+  UserListItem,
+} from '../domain/user.repository';
 
 @Injectable()
 export class UserService {
@@ -18,13 +22,15 @@ export class UserService {
   public async findAllUsers(params: {
     page: number;
     pageSize: number;
+    filter: UserListFilter;
   }): Promise<Result<Page<UserListItem>>> {
     const [users, total] = await Promise.all([
       this.userRepository.findAll({
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
+        ...params.filter,
       }),
-      this.userRepository.count(),
+      this.userRepository.count(params.filter),
     ]);
     return Result.ok({
       meta: {
@@ -199,8 +205,7 @@ export class UserService {
     lastName: string;
     ci: string;
     phone?: string;
-    roleIds?: string[];
-    profiles?: Array<'ADMIN' | 'STUDENT'>;
+    profiles: Array<'ADMIN' | 'STUDENT'>;
   }): Promise<
     Result<{
       id: string;
@@ -237,36 +242,19 @@ export class UserService {
       phone: params.phone ?? null,
     });
 
-    let roleRows: Array<{ id: string; name: string }> = [];
-    if (params.roleIds?.length) {
-      roleRows = await this.prisma.role.findMany({
-        where: { id: { in: params.roleIds } },
-      });
-      if (roleRows.length !== params.roleIds.length) {
-        return Result.fail('One or more role IDs are invalid');
-      }
-    }
-
     await this.userRepository.save(user);
 
     let studentProfileId: string | null = null;
     let adminProfileId: string | null = null;
 
-    const wantsAdmin =
-      params.profiles?.includes('ADMIN') ?? roleRows.length > 0;
-    if (wantsAdmin) {
+    if (params.profiles.includes('ADMIN')) {
       const adminProfile = await this.prisma.adminProfile.create({
-        data: {
-          userId: user.id,
-          roles: {
-            create: roleRows.map((r: { id: string }) => ({ roleId: r.id })),
-          },
-        },
+        data: { userId: user.id },
       });
       adminProfileId = adminProfile.id;
     }
 
-    if (params.profiles?.includes('STUDENT')) {
+    if (params.profiles.includes('STUDENT')) {
       const studentProfile = await this.prisma.studentProfile.create({
         data: { userId: user.id },
       });
@@ -282,7 +270,7 @@ export class UserService {
         ...(adminProfileId ? (['ADMIN'] as const) : []),
         ...(studentProfileId ? (['STUDENT'] as const) : []),
       ],
-      roles: roleRows.map((r: { name: string }) => r.name),
+      roles: [],
       studentProfileId,
       adminProfileId,
     });

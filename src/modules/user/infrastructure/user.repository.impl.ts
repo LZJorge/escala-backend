@@ -1,17 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { User } from '@core/domain/user.entity';
-import { UserRepository, UserListItem } from '../domain/user.repository';
+import {
+  UserRepository,
+  UserListItem,
+  UserListFilter,
+} from '../domain/user.repository';
 
 @Injectable()
 export class PrismaUserRepository implements UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  public async findAll(params: {
-    skip: number;
-    take: number;
-  }): Promise<UserListItem[]> {
-    type UserWithRoles = {
+  public async findAll(
+    params: { skip: number; take: number } & UserListFilter,
+  ): Promise<UserListItem[]> {
+    type UserWithProfiles = {
       id: string;
       email: string;
       firstName: string;
@@ -22,20 +26,23 @@ export class PrismaUserRepository implements UserRepository {
       adminProfile: {
         roles: Array<{ role: { name: string } }>;
       } | null;
+      studentProfile: { id: string } | null;
     };
 
     const records = await this.prisma.user.findMany({
+      where: this.buildWhere(params),
       include: {
         adminProfile: {
           include: { roles: { include: { role: true } } },
         },
+        studentProfile: true,
       },
       orderBy: { createdAt: 'asc' },
       skip: params.skip,
       take: params.take,
     });
 
-    return records.map((r: UserWithRoles) => ({
+    return records.map((r: UserWithProfiles) => ({
       id: r.id,
       email: r.email,
       firstName: r.firstName,
@@ -43,6 +50,10 @@ export class PrismaUserRepository implements UserRepository {
       ci: r.ci,
       phone: r.phone,
       isActive: r.isActive,
+      profiles: [
+        ...(r.adminProfile ? (['ADMIN'] as const) : []),
+        ...(r.studentProfile ? (['STUDENT'] as const) : []),
+      ],
       roles:
         r.adminProfile?.roles.map(
           (ar: { role: { name: string } }) => ar.role.name,
@@ -50,8 +61,64 @@ export class PrismaUserRepository implements UserRepository {
     }));
   }
 
-  public async count(): Promise<number> {
-    return this.prisma.user.count();
+  public async count(filter?: UserListFilter): Promise<number> {
+    return this.prisma.user.count({
+      where: filter ? this.buildWhere(filter) : undefined,
+    });
+  }
+
+  private buildWhere(filter: UserListFilter): Prisma.UserWhereInput {
+    const where: Prisma.UserWhereInput = {};
+
+    if (filter.q) {
+      where.OR = [
+        { email: { contains: filter.q, mode: 'insensitive' } },
+        { firstName: { contains: filter.q, mode: 'insensitive' } },
+        { lastName: { contains: filter.q, mode: 'insensitive' } },
+        { ci: { contains: filter.q, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filter.isActive !== undefined) {
+      where.isActive = filter.isActive;
+    }
+
+    const relations: Prisma.UserWhereInput[] = [];
+    if (filter.profile === 'ADMIN') {
+      relations.push({ adminProfile: { isNot: null } });
+    } else if (filter.profile === 'STUDENT') {
+      relations.push({ studentProfile: { isNot: null } });
+    } else if (filter.profile === 'NONE') {
+      relations.push({
+        adminProfile: { is: null },
+        studentProfile: { is: null },
+      });
+    }
+    if (filter.roleId) {
+      relations.push({
+        adminProfile: { roles: { some: { roleId: filter.roleId } } },
+      });
+    }
+    if (filter.enrollmentYear !== undefined) {
+      relations.push({
+        studentProfile: { enrollmentYear: filter.enrollmentYear },
+      });
+    }
+    if (relations.length > 0) {
+      where.AND = relations;
+    }
+
+    if (filter.createdFrom || filter.createdTo) {
+      where.createdAt = {};
+      if (filter.createdFrom) {
+        where.createdAt.gte = filter.createdFrom;
+      }
+      if (filter.createdTo) {
+        where.createdAt.lte = filter.createdTo;
+      }
+    }
+
+    return where;
   }
 
   public async findById(id: string): Promise<User | null> {

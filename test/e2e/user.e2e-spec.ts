@@ -216,6 +216,194 @@ describe('Users', () => {
       );
     });
 
+    it('filters users by profile', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read', 'student.read'],
+        'filterer',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('filter_password', salt, 64).toString('hex');
+      const password = `${salt}:${hash}`;
+
+      const adminUser = await prisma.user.create({
+        data: {
+          email: 'admin-filter@test.edu',
+          password,
+          firstName: 'Admin',
+          lastName: 'Filter',
+          ci: 'admin-filter-ci',
+        },
+      });
+      await prisma.adminProfile.create({ data: { userId: adminUser.id } });
+
+      const studentUser = await prisma.user.create({
+        data: {
+          email: 'student-filter@test.edu',
+          password,
+          firstName: 'Student',
+          lastName: 'Filter',
+          ci: 'student-filter-ci',
+        },
+      });
+      await prisma.studentProfile.create({
+        data: { userId: studentUser.id, enrollmentYear: 2026 },
+      });
+
+      await prisma.user.create({
+        data: {
+          email: 'none-filter@test.edu',
+          password,
+          firstName: 'None',
+          lastName: 'Filter',
+          ci: 'none-filter-ci',
+        },
+      });
+
+      const students = await request(app.getHttpServer())
+        .get('/users?profile=STUDENT')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const studentEmails = students.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(studentEmails).toContain('student-filter@test.edu');
+      expect(studentEmails).not.toContain('admin-filter@test.edu');
+      expect(studentEmails).not.toContain('none-filter@test.edu');
+
+      const admins = await request(app.getHttpServer())
+        .get('/users?profile=ADMIN')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const adminEmails = admins.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(adminEmails).toContain('admin-filter@test.edu');
+      expect(adminEmails).not.toContain('student-filter@test.edu');
+
+      const none = await request(app.getHttpServer())
+        .get('/users?profile=NONE')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const noneEmails = none.body.data.map((u: { email: string }) => u.email);
+      expect(noneEmails).toContain('none-filter@test.edu');
+      expect(noneEmails).not.toContain('admin-filter@test.edu');
+    });
+
+    it('filters by text, active status, role and enrollment year', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read', 'student.read'],
+        'filterer2',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('filter_password', salt, 64).toString('hex');
+      const password = `${salt}:${hash}`;
+
+      const searchUser = await prisma.user.create({
+        data: {
+          email: 'juan@test.edu',
+          password,
+          firstName: 'Juan',
+          lastName: 'Perez',
+          ci: '12345678',
+        },
+      });
+      await prisma.studentProfile.create({
+        data: { userId: searchUser.id, enrollmentYear: 2025 },
+      });
+
+      const role = await prisma.role.create({
+        data: { name: 'Filter Role', isEditable: true },
+      });
+      const roleUser = await prisma.user.create({
+        data: {
+          email: 'roler@test.edu',
+          password,
+          firstName: 'Roler',
+          lastName: 'User',
+          ci: 'roler-ci',
+        },
+      });
+      const roleAdminProfile = await prisma.adminProfile.create({
+        data: { userId: roleUser.id },
+      });
+      await prisma.adminRole.create({
+        data: { adminProfileId: roleAdminProfile.id, roleId: role.id },
+      });
+
+      await prisma.user.create({
+        data: {
+          email: 'inactive@test.edu',
+          password,
+          firstName: 'Inactive',
+          lastName: 'User',
+          ci: 'inactive-ci',
+          isActive: false,
+        },
+      });
+
+      const qResponse = await request(app.getHttpServer())
+        .get('/users?q=juan')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const qEmails = qResponse.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(qEmails).toContain('juan@test.edu');
+      expect(qEmails).not.toContain('roler@test.edu');
+
+      const roleResponse = await request(app.getHttpServer())
+        .get(`/users?roleId=${role.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const roleEmails = roleResponse.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(roleEmails).toContain('roler@test.edu');
+      expect(roleEmails).not.toContain('juan@test.edu');
+      expect(roleResponse.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            email: 'roler@test.edu',
+            profiles: ['ADMIN'],
+          }),
+        ]),
+      );
+
+      const activeResponse = await request(app.getHttpServer())
+        .get('/users?isActive=true')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const activeEmails = activeResponse.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(activeEmails).toContain('juan@test.edu');
+      expect(activeEmails).not.toContain('inactive@test.edu');
+
+      const yearResponse = await request(app.getHttpServer())
+        .get('/users?profile=STUDENT&enrollmentYear=2025')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const yearEmails = yearResponse.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(yearEmails).toContain('juan@test.edu');
+      expect(yearEmails).not.toContain('roler@test.edu');
+      expect(yearResponse.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            email: 'juan@test.edu',
+            profiles: ['STUDENT'],
+          }),
+        ]),
+      );
+    });
+
     it('returns 403 without user.read permission', async () => {
       const salt = randomBytes(16).toString('hex');
       const hash = scryptSync('user_password', salt, 64).toString('hex');
@@ -296,6 +484,7 @@ describe('Users', () => {
           firstName: 'New',
           lastName: 'User',
           ci: 'new-ci',
+          profiles: ['STUDENT'],
         })
         .expect(201);
 
@@ -303,8 +492,11 @@ describe('Users', () => {
         email: 'newuser@test.edu',
         firstName: 'New',
         lastName: 'User',
+        profiles: ['STUDENT'],
       });
       expect(response.body.data.id).toBeDefined();
+      expect(response.body.data.studentProfileId).toBeDefined();
+      expect(response.body.data.adminProfileId).toBeNull();
 
       const saved = await prisma.user.findUnique({
         where: { email: 'newuser@test.edu' },
@@ -344,6 +536,7 @@ describe('Users', () => {
           firstName: 'Should',
           lastName: 'Fail',
           ci: 'fail-ci',
+          profiles: ['STUDENT'],
         })
         .expect(403);
 
@@ -353,6 +546,68 @@ describe('Users', () => {
         path: '/users',
       });
       expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('creates a user with an ADMIN profile without roles', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.create', 'user.read'],
+        'admin-creator',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'newadmin@test.edu',
+          password: 'new_password',
+          firstName: 'New',
+          lastName: 'Admin',
+          ci: 'new-admin-ci',
+          profiles: ['ADMIN'],
+        })
+        .expect(201);
+
+      expect(response.body.data).toMatchObject({
+        email: 'newadmin@test.edu',
+        profiles: ['ADMIN'],
+        roles: [],
+      });
+      expect(response.body.data.adminProfileId).toBeDefined();
+
+      const savedAdminProfile = await prisma.adminProfile.findUnique({
+        where: { userId: response.body.data.id },
+        include: { roles: true },
+      });
+      expect(savedAdminProfile).not.toBeNull();
+      expect(savedAdminProfile!.roles).toEqual([]);
+    });
+
+    it('rejects a user without any profile with 400', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.create', 'user.read'],
+        'no-profile-creator',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'noprofile@test.edu',
+          password: 'new_password',
+          firstName: 'No',
+          lastName: 'Profile',
+          ci: 'no-profile-ci',
+        })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        errorCode: ErrorCodes.ERR_VALIDATION_FAILED,
+      });
     });
   });
 
@@ -434,6 +689,7 @@ describe('Users', () => {
           firstName: 'Duplicate',
           lastName: 'Email',
           ci: 'different-ci',
+          profiles: ['STUDENT'],
         })
         .expect(422);
 
@@ -474,6 +730,7 @@ describe('Users', () => {
           firstName: 'Duplicate',
           lastName: 'CI',
           ci: 'dup-ci',
+          profiles: ['STUDENT'],
         })
         .expect(422);
 

@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsArray,
   IsIn,
+  ArrayMinSize,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -38,23 +39,15 @@ export class CreateUserDto {
   @IsString()
   public readonly phone?: string;
 
-  @ApiPropertyOptional({
-    example: ['ADMIN'],
-    description: 'Profiles to create: ADMIN (staff/teacher), STUDENT',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsIn(['ADMIN', 'STUDENT'], { each: true })
-  public readonly profiles?: Array<'ADMIN' | 'STUDENT'>;
-
-  @ApiPropertyOptional({
-    example: ['role-uuid-1'],
+  @ApiProperty({
     description:
-      'Role IDs to assign on creation (applied to the ADMIN profile)',
+      'Profiles to create. At least one is required: ADMIN (staff/teacher), STUDENT. Roles are assigned later via POST /users/:userId/roles.',
+    example: ['STUDENT'],
+    enum: ['ADMIN', 'STUDENT'],
+    isArray: true,
   })
-  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  @IsNotEmpty({ each: true })
-  public readonly roleIds?: string[];
+  @ArrayMinSize(1)
+  @IsIn(['ADMIN', 'STUDENT'], { each: true })
+  public readonly profiles: Array<'ADMIN' | 'STUDENT'>;
 }

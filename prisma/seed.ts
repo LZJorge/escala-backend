@@ -13,6 +13,7 @@ const PERMISSIONS: Array<{ code: string; module: string; description: string }> 
   { code: 'user.read', module: 'user', description: 'View users in the institution' },
   { code: 'user.update', module: 'user', description: 'Update user profiles in the institution' },
   { code: 'user.delete', module: 'user', description: 'Remove users from the institution' },
+  { code: 'student.read', module: 'student', description: 'View students' },
   { code: 'role.create', module: 'role', description: 'Create custom roles' },
   { code: 'role.read', module: 'role', description: 'View roles and their permissions' },
   { code: 'role.update', module: 'role', description: 'Modify role permissions' },
