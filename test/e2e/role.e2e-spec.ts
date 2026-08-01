@@ -14,7 +14,7 @@ async function loginWithPermissions(
   suffix: string,
 ): Promise<string> {
   const permissions = await Promise.all(
-    permissionCodes.map((code) =>
+    permissionCodes.map((code: string) =>
       prisma.permission.create({
         data: { code, module: code.split('.')[0], description: code },
       }),
@@ -26,7 +26,10 @@ async function loginWithPermissions(
   });
 
   await prisma.rolePermission.createMany({
-    data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
+    data: permissions.map((p: { id: string }) => ({
+      roleId: role.id,
+      permissionId: p.id,
+    })),
   });
 
   const salt = randomBytes(16).toString('hex');
@@ -42,8 +45,12 @@ async function loginWithPermissions(
     },
   });
 
-  await prisma.userRole.create({
-    data: { userId: user.id, roleId: role.id },
+  const adminProfile = await prisma.adminProfile.create({
+    data: { userId: user.id },
+  });
+
+  await prisma.adminRole.create({
+    data: { adminProfileId: adminProfile.id, roleId: role.id },
   });
 
   const loginResponse = await request(app.getHttpServer())
@@ -177,7 +184,9 @@ describe('Roles', () => {
         where: { roleId: role.id },
         include: { permission: true },
       });
-      const codes = remaining.map((rp) => rp.permission.code).sort();
+      const codes = remaining
+        .map((rp: { permission: { code: string } }) => rp.permission.code)
+        .sort();
       expect(codes).toEqual(['course.delete', 'course.read']);
     });
 

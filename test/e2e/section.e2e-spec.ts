@@ -18,7 +18,7 @@ async function loginWithPermissions(
   suffix: string,
 ): Promise<string> {
   const permissions = await Promise.all(
-    permissionCodes.map((code) =>
+    permissionCodes.map((code: string) =>
       prisma.permission.create({
         data: { code, module: code.split('.')[0], description: code },
       }),
@@ -30,7 +30,10 @@ async function loginWithPermissions(
   });
 
   await prisma.rolePermission.createMany({
-    data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
+    data: permissions.map((p: { id: string }) => ({
+      roleId: role.id,
+      permissionId: p.id,
+    })),
   });
 
   const salt = randomBytes(16).toString('hex');
@@ -46,8 +49,12 @@ async function loginWithPermissions(
     },
   });
 
-  await prisma.userRole.create({
-    data: { userId: user.id, roleId: role.id },
+  const adminProfile = await prisma.adminProfile.create({
+    data: { userId: user.id },
+  });
+
+  await prisma.adminRole.create({
+    data: { adminProfileId: adminProfile.id, roleId: role.id },
   });
 
   const loginRes = await request(app.getHttpServer())
@@ -136,7 +143,7 @@ describe('Sections', () => {
     });
 
     const teacherRole = await prisma.role.create({
-      data: { name: `teacher-${suffix}`, isStudent: false },
+      data: { name: `teacher-${suffix}`, isEditable: true },
     });
 
     const teacherSalt = randomBytes(16).toString('hex');
@@ -152,8 +159,12 @@ describe('Sections', () => {
       },
     });
 
-    await prisma.userRole.create({
-      data: { userId: teacher.id, roleId: teacherRole.id },
+    const teacherProfile = await prisma.adminProfile.create({
+      data: { userId: teacher.id },
+    });
+
+    await prisma.adminRole.create({
+      data: { adminProfileId: teacherProfile.id, roleId: teacherRole.id },
     });
 
     const studentSalt = randomBytes(16).toString('hex');
@@ -173,7 +184,7 @@ describe('Sections', () => {
       termId: term.id,
       closedTermId: closedTerm.id,
       courseId: course.id,
-      teacherId: teacher.id,
+      teacherId: teacherProfile.id,
       studentId: student.id,
     };
   }
@@ -758,11 +769,15 @@ describe('Sections', () => {
         },
       });
 
+      const otherTeacherProfile = await prisma.adminProfile.create({
+        data: { userId: otherTeacher.id },
+      });
+
       await prisma.courseSection.create({
         data: {
           courseId,
           termId,
-          teacherId: otherTeacher.id,
+          teacherId: otherTeacherProfile.id,
           name: 'Other Teacher',
           capacity: 30,
         },

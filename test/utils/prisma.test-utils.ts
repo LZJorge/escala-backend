@@ -6,14 +6,16 @@ export async function clearDatabase(prisma: PrismaClient): Promise<void> {
   >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;
 
   const cleanable = tableNames
-    .map((row) => row.tablename)
-    .filter((name) => name !== '_prisma_migrations');
+    .map((row: { tablename: string }) => row.tablename)
+    .filter((name: string) => name !== '_prisma_migrations');
 
   if (cleanable.length === 0) {
     return;
   }
 
-  const tables = cleanable.map((name) => `"public"."${name}"`).join(', ');
+  const tables = cleanable
+    .map((name: string) => `"public"."${name}"`)
+    .join(', ');
 
   try {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
