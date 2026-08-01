@@ -89,7 +89,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.create'],
+        ['term.create', 'term.read'],
         'create-ok',
       );
 
@@ -113,7 +113,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.create'],
+        ['term.create', 'term.read'],
         'create-bad-dates',
       );
 
@@ -253,7 +253,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.update'],
+        ['term.update', 'term.read'],
         'patch-ok',
       );
 
@@ -279,7 +279,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.update'],
+        ['term.update', 'term.read'],
         'patch-closed',
       );
 
@@ -312,7 +312,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.close'],
+        ['term.close', 'term.read'],
         'status-activate',
       );
 
@@ -338,7 +338,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.close'],
+        ['term.close', 'term.read'],
         'status-skip',
       );
 
@@ -369,7 +369,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.close'],
+        ['term.close', 'term.read'],
         'status-conflict',
       );
 
@@ -411,7 +411,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.delete'],
+        ['term.delete', 'term.read'],
         'delete-ok',
       );
 
@@ -437,7 +437,7 @@ describe('Terms', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['term.delete'],
+        ['term.delete', 'term.read'],
         'delete-blocked',
       );
 

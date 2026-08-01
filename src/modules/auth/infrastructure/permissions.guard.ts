@@ -49,7 +49,16 @@ export class PermissionsGuard implements CanActivate {
       }
     }
 
-    const hasAll = required.every((p: string) => userPermissionCodes.has(p));
+    const expandedRequired = required.flatMap((p: string) => {
+      const dot = p.lastIndexOf('.');
+      const module = p.slice(0, dot);
+      const action = p.slice(dot + 1);
+      return action === 'read' ? [p] : [p, `${module}.read`];
+    });
+
+    const hasAll = expandedRequired.every((p: string) =>
+      userPermissionCodes.has(p),
+    );
     if (!hasAll) {
       throw new DomainException(
         ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,

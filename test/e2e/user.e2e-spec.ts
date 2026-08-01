@@ -156,12 +156,123 @@ describe('Users', () => {
     });
   });
 
+  describe('GET /users', () => {
+    it('returns all users with their roles for user.read permission', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read'],
+        'reader',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('target_password', salt, 64).toString('hex');
+
+      const role = await prisma.role.create({
+        data: { name: 'Editor', isEditable: true },
+      });
+
+      const targetUser = await prisma.user.create({
+        data: {
+          email: 'listed@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Listed',
+          lastName: 'User',
+          ci: 'listed-ci',
+        },
+      });
+
+      await prisma.userRole.create({
+        data: { userId: targetUser.id, roleId: role.id },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            email: 'listed@test.edu',
+            firstName: 'Listed',
+            lastName: 'User',
+            ci: 'listed-ci',
+            isActive: true,
+            roles: ['Editor'],
+          }),
+        ]),
+      );
+    });
+
+    it('returns 403 without user.read permission', async () => {
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('user_password', salt, 64).toString('hex');
+
+      await prisma.user.create({
+        data: {
+          email: 'noperm@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'No',
+          lastName: 'Perm',
+          ci: 'noperm-ci',
+        },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'noperm@test.edu', password: 'user_password' })
+        .expect(200);
+
+      const token: string = loginResponse.body.data.accessToken;
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/users',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('allows super admin to list users', async () => {
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('test_password', salt, 64).toString('hex');
+
+      await prisma.superAdmin.create({
+        data: {
+          email: 'admin@test.edu',
+          password: `${salt}:${hash}`,
+          mustChangePassword: false,
+        },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'admin@test.edu', password: 'test_password' })
+        .expect(200);
+
+      const token: string = loginResponse.body.data.accessToken;
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual([]);
+    });
+  });
+
   describe('POST /users', () => {
     it('creates a user when authenticated with user.create permission', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['user.create'],
+        ['user.create', 'user.read'],
         'creator',
       );
 
@@ -239,7 +350,7 @@ describe('Users', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['role.assign'],
+        ['role.assign', 'role.read'],
         'assigner',
       );
 
@@ -283,7 +394,7 @@ describe('Users', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['user.create'],
+        ['user.create', 'user.read'],
         'dup-email-operator',
       );
 
@@ -323,7 +434,7 @@ describe('Users', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['user.create'],
+        ['user.create', 'user.read'],
         'dup-ci-operator',
       );
 

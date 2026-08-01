@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { Result } from '@core/domain/result';
+import { Page } from '@core/domain/page';
+import { readDependencyError } from '@core/domain/permission-policy';
 import { Role } from '../domain/role.entity';
 
 @Injectable()
@@ -23,6 +25,11 @@ export class RoleService {
     });
     if (permissions.length !== params.permissionCodes.length) {
       return Result.fail('One or more permission codes are invalid');
+    }
+
+    const dependencyError = readDependencyError(params.permissionCodes);
+    if (dependencyError) {
+      return Result.fail(dependencyError);
     }
 
     const role = new Role({
@@ -55,9 +62,9 @@ export class RoleService {
     });
   }
 
-  public async findAll(): Promise<
+  public async findAll(params: { page: number; pageSize: number }): Promise<
     Result<
-      Array<{
+      Page<{
         id: string;
         name: string;
         isStudent: boolean;
@@ -66,13 +73,24 @@ export class RoleService {
       }>
     >
   > {
-    const roles = await this.prisma.role.findMany({
-      include: { permissions: { include: { permission: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [roles, total] = await Promise.all([
+      this.prisma.role.findMany({
+        include: { permissions: { include: { permission: true } } },
+        orderBy: { createdAt: 'asc' },
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.prisma.role.count(),
+    ]);
 
-    return Result.ok(
-      roles.map(
+    return Result.ok({
+      meta: {
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+        totalPages: Math.ceil(total / params.pageSize),
+      },
+      data: roles.map(
         (r: {
           id: string;
           name: string;
@@ -89,7 +107,7 @@ export class RoleService {
           ),
         }),
       ),
-    );
+    });
   }
 
   public async findById(roleId: string): Promise<
@@ -147,6 +165,11 @@ export class RoleService {
       });
       if (permissions.length !== permissionCodes.length) {
         return Result.fail('One or more permission codes are invalid');
+      }
+
+      const dependencyError = readDependencyError(permissionCodes);
+      if (dependencyError) {
+        return Result.fail(dependencyError);
       }
     } else {
       const current = await this.prisma.rolePermission.findMany({

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,6 +22,8 @@ import {
   RoleResponseDto,
 } from '../application/role.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { PaginationDto } from '@core/infrastructure/http/pagination.dto';
+import { Page } from '@core/domain/page';
 import { DomainException } from '@core/domain/domain.exception';
 import { ErrorCodes } from '@core/domain/error-codes';
 
@@ -49,10 +52,12 @@ export class RoleController {
 
   @Get()
   @RequirePermission('role.read')
-  @ApiOperation({ summary: 'List all roles' })
+  @ApiOperation({ summary: 'List roles (paginated)' })
   @ApiOkResponse({ type: [RoleResponseDto] })
-  public async findAll(): Promise<RoleResponseDto[]> {
-    const result = await this.roleService.findAll();
+  public async findAll(
+    @Query() query: PaginationDto,
+  ): Promise<Page<RoleResponseDto>> {
+    const result = await this.roleService.findAll(query);
     return result.value;
   }
 

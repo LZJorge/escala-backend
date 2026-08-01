@@ -16,6 +16,8 @@ describe('User (e2e)', () => {
   let prismaMock: PrismaServiceMock;
   let redisMock: RedisServiceMock;
   let userRepositoryMock: {
+    findAll: jest.Mock;
+    count: jest.Mock;
     findById: jest.Mock;
     findByEmail: jest.Mock;
     findByCi: jest.Mock;
@@ -31,6 +33,8 @@ describe('User (e2e)', () => {
     prismaMock = new PrismaServiceMock();
     redisMock = new RedisServiceMock();
     userRepositoryMock = {
+      findAll: jest.fn(),
+      count: jest.fn(),
       findById: jest.fn(),
       findByEmail: jest.fn(),
       findByCi: jest.fn(),
@@ -94,7 +98,7 @@ describe('User (e2e)', () => {
               name: 'Editor',
               permissions: [
                 { permission: { code: 'course.create' } },
-                { permission: { code: 'course.view' } },
+                { permission: { code: 'course.read' } },
               ],
             },
           },
@@ -113,7 +117,7 @@ describe('User (e2e)', () => {
       });
       expect(response.body.data.roles).toEqual(['Editor']);
       expect(response.body.data.permissions).toEqual(
-        expect.arrayContaining(['course.create', 'course.view']),
+        expect.arrayContaining(['course.create', 'course.read']),
       );
     });
 
@@ -184,6 +188,71 @@ describe('User (e2e)', () => {
     });
   });
 
+  describe('GET /users', () => {
+    it('returns 200 with users and their roles for user.read permission', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.read' } }],
+          },
+        },
+      ]);
+      userRepositoryMock.findAll.mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'one@test.edu',
+          firstName: 'One',
+          lastName: 'User',
+          ci: '1',
+          phone: null,
+          isActive: true,
+          roles: ['Editor'],
+        },
+        {
+          id: 'user-2',
+          email: 'two@test.edu',
+          firstName: 'Two',
+          lastName: 'User',
+          ci: '2',
+          phone: '+584141234567',
+          isActive: false,
+          roles: [],
+        },
+      ]);
+      userRepositoryMock.count.mockResolvedValue(2);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(response.body.meta).toMatchObject({
+        page: 1,
+        pageSize: 20,
+        total: 2,
+      });
+      expect(response.body.data).toEqual([
+        expect.objectContaining({ email: 'one@test.edu', roles: ['Editor'] }),
+        expect.objectContaining({ email: 'two@test.edu', isActive: false }),
+      ]);
+    });
+
+    it('returns 403 without user.read permission', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/users')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/users',
+      });
+    });
+  });
+
   describe('PATCH /users/me', () => {
     it('returns 200 with the updated profile', async () => {
       const user = buildUser({ phone: null });
@@ -231,7 +300,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'user.create' } }],
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
           },
         },
       ]);
@@ -254,7 +326,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'user.create' } }],
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
           },
         },
       ]);
@@ -301,6 +376,28 @@ describe('User (e2e)', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
+    it('returns 403 with user.create but no user.read', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.create' } }],
+          },
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: createUrl,
+      });
+    });
+
     it('returns 401 without token', async () => {
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -314,6 +411,139 @@ describe('User (e2e)', () => {
       });
       expect(response.body).toHaveProperty('timestamp');
     });
+
+    it('creates user with roles and returns them', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      userRepositoryMock.save.mockResolvedValue(undefined);
+      prismaMock.role.findMany.mockResolvedValue([
+        { id: 'role-1', name: 'Editor' },
+      ]);
+      prismaMock.userRole.createMany.mockResolvedValue({ count: 1 });
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ ...validPayload, roleIds: ['role-1'] })
+        .expect(201);
+
+      expect(response.body.data.roles).toEqual(['Editor']);
+      expect(prismaMock.userRole.createMany).toHaveBeenCalledWith({
+        data: [{ userId: expect.any(String), roleId: 'role-1' }],
+      });
+    });
+
+    it('returns 422 when a role ID is invalid', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      prismaMock.role.findMany.mockResolvedValue([
+        { id: 'role-1', name: 'Editor' },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ ...validPayload, roleIds: ['role-1', 'nonexistent'] })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+        path: createUrl,
+      });
+    });
+  });
+
+  describe('PATCH /users/:userId', () => {
+    it('returns 200 when admin updates a user', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.update' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findById.mockResolvedValue(buildUser({ phone: null }));
+      userRepositoryMock.update.mockResolvedValue(undefined);
+
+      const response = await request(app.getHttpServer())
+        .patch('/users/target-user-id')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ firstName: 'Updated' })
+        .expect(200);
+
+      expect(response.body.data.firstName).toBe('Updated');
+    });
+
+    it('returns 404 when user not found', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.update' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findById.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .patch('/users/non-existent')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ firstName: 'Updated' })
+        .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_USER_NOT_FOUND,
+        path: '/users/non-existent',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('returns 403 without user.update permission', async () => {
+      prismaMock.userRole.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .patch('/users/target-user-id')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ firstName: 'Updated' })
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/users/target-user-id',
+      });
+    });
   });
 
   describe('DELETE /users/:userId', () => {
@@ -321,7 +551,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'user.delete' } }],
+            permissions: [
+              { permission: { code: 'user.delete' } },
+              { permission: { code: 'user.read' } },
+            ],
           },
         },
       ]);
@@ -339,7 +572,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'user.delete' } }],
+            permissions: [
+              { permission: { code: 'user.delete' } },
+              { permission: { code: 'user.read' } },
+            ],
           },
         },
       ]);
@@ -365,7 +601,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'role.assign' } }],
+            permissions: [
+              { permission: { code: 'role.assign' } },
+              { permission: { code: 'role.read' } },
+            ],
           },
         },
       ]);
@@ -390,7 +629,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'role.assign' } }],
+            permissions: [
+              { permission: { code: 'role.assign' } },
+              { permission: { code: 'role.read' } },
+            ],
           },
         },
       ]);
@@ -417,7 +659,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'role.assign' } }],
+            permissions: [
+              { permission: { code: 'role.assign' } },
+              { permission: { code: 'role.read' } },
+            ],
           },
         },
       ]);
@@ -440,7 +685,10 @@ describe('User (e2e)', () => {
       prismaMock.userRole.findMany.mockResolvedValue([
         {
           role: {
-            permissions: [{ permission: { code: 'role.assign' } }],
+            permissions: [
+              { permission: { code: 'role.assign' } },
+              { permission: { code: 'role.read' } },
+            ],
           },
         },
       ]);

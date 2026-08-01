@@ -183,7 +183,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-simple',
       );
 
@@ -208,7 +208,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-comp',
       );
 
@@ -248,7 +248,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-closed',
       );
 
@@ -278,7 +278,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-cap',
       );
 
@@ -302,7 +302,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-cap2',
       );
 
@@ -326,7 +326,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.create'],
+        ['section.create', 'section.read'],
         'create-bad-role',
       );
 
@@ -378,7 +378,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-ok',
       );
 
@@ -397,7 +397,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-inv',
       );
 
@@ -421,7 +421,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-part',
       );
 
@@ -464,7 +464,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-full',
       );
 
@@ -507,7 +507,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-room',
       );
 
@@ -556,7 +556,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-adj',
       );
 
@@ -592,7 +592,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'sch-term',
       );
 
@@ -783,7 +783,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.update'],
+        ['section.update', 'section.read'],
         'patch-cap',
       );
 
@@ -806,7 +806,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.update'],
+        ['section.update', 'section.read'],
         'patch-closed',
       );
 
@@ -842,7 +842,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.delete'],
+        ['section.delete', 'section.read'],
         'del-cascade',
       );
 
@@ -895,7 +895,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.delete'],
+        ['section.delete', 'section.read'],
         'del-closed',
       );
 
@@ -930,7 +930,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule'],
+        ['section.schedule', 'section.read'],
         'del-sch',
       );
 

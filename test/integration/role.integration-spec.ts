@@ -81,7 +81,7 @@ describe('Role (e2e)', () => {
         },
         {
           id: 'perm-2',
-          code: 'course.view',
+          code: 'course.read',
           module: 'course',
           description: null,
         },
@@ -92,7 +92,7 @@ describe('Role (e2e)', () => {
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Coordinator',
-          permissionCodes: ['course.create', 'course.view'],
+          permissionCodes: ['course.create', 'course.read'],
         })
         .expect(201);
 
@@ -100,8 +100,35 @@ describe('Role (e2e)', () => {
       expect(response.body.data.name).toBe('Coordinator');
       expect(response.body.data.permissionCodes).toEqual([
         'course.create',
-        'course.view',
+        'course.read',
       ]);
+    });
+
+    it('returns 422 when a permission lacks its .read dependency', async () => {
+      prismaMock.permission.findMany.mockResolvedValue([
+        {
+          id: 'perm-1',
+          code: 'course.create',
+          module: 'course',
+          description: null,
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({
+          name: 'Broken Role',
+          permissionCodes: ['course.create'],
+        })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_CREATION_FAILED,
+        path: url,
+      });
+      expect(response.body.message).toContain('requires "course.read"');
     });
 
     it('returns 422 when permission codes are invalid', async () => {
@@ -166,12 +193,18 @@ describe('Role (e2e)', () => {
           permissions: [],
         },
       ]);
+      prismaMock.role.count.mockResolvedValue(2);
 
       const response = await request(app.getHttpServer())
         .get('/roles')
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(200);
 
+      expect(response.body.meta).toMatchObject({
+        page: 1,
+        pageSize: 20,
+        total: 2,
+      });
       expect(response.body.data).toHaveLength(2);
       expect(response.body.data[0].name).toBe('Admin');
     });
@@ -231,6 +264,12 @@ describe('Role (e2e)', () => {
           module: 'course',
           description: null,
         },
+        {
+          id: 'perm-2',
+          code: 'course.read',
+          module: 'course',
+          description: null,
+        },
       ]);
       prismaMock.rolePermission.findMany.mockResolvedValue([
         { permission: { code: 'course.create' } },
@@ -239,10 +278,43 @@ describe('Role (e2e)', () => {
       const response = await request(app.getHttpServer())
         .patch(url)
         .set('Authorization', `Bearer ${regularToken}`)
-        .send({ name: 'New Name', permissionCodes: ['course.create'] })
+        .send({
+          name: 'New Name',
+          permissionCodes: ['course.create', 'course.read'],
+        })
         .expect(200);
 
       expect(response.body.data.name).toBe('New Name');
+    });
+
+    it('returns 422 when permissionCodes lack their .read dependency', async () => {
+      prismaMock.role.findUnique.mockResolvedValue({
+        id: 'role-1',
+        name: 'Old Name',
+        isStudent: false,
+        isEditable: true,
+      });
+      prismaMock.permission.findMany.mockResolvedValue([
+        {
+          id: 'perm-1',
+          code: 'course.create',
+          module: 'course',
+          description: null,
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .patch(url)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ permissionCodes: ['course.create'] })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_ROLE_UPDATE_FAILED,
+        path: url,
+      });
+      expect(response.body.message).toContain('requires "course.read"');
     });
 
     it('returns 422 when trying to modify a non-editable role', async () => {

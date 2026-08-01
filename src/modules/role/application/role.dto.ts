@@ -7,7 +7,7 @@ export class CreateRoleDto {
   @IsNotEmpty()
   public readonly name: string;
 
-  @ApiProperty({ example: ['course.create', 'course.view', 'section.view'] })
+  @ApiProperty({ example: ['course.create', 'course.read', 'section.read'] })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
@@ -21,7 +21,7 @@ export class UpdateRoleDto {
   @IsNotEmpty()
   public readonly name?: string;
 
-  @ApiPropertyOptional({ example: ['course.create', 'course.view'] })
+  @ApiPropertyOptional({ example: ['course.create', 'course.read'] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

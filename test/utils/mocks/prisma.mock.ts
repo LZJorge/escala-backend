@@ -3,6 +3,7 @@ export class PrismaModelMock {
   public readonly findUnique = jest.fn();
   public readonly findMany = jest.fn();
   public readonly create = jest.fn();
+  public readonly createMany = jest.fn();
   public readonly update = jest.fn();
   public readonly delete = jest.fn();
   public readonly deleteMany = jest.fn();

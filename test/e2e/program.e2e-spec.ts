@@ -169,7 +169,7 @@ describe('Programs', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['program.delete'],
+        ['program.delete', 'program.read'],
         'deleter',
       );
 

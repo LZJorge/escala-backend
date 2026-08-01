@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -24,7 +25,10 @@ import { UpdateProfileDto } from '../application/update-profile.dto';
 import { UserProfileDto } from '../application/user-profile.dto';
 import { CreateUserDto } from '../application/create-user.dto';
 import { AssignRoleDto } from '../application/assign-role.dto';
+import { UserListItem } from '../domain/user.repository';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
+import { PaginationDto } from '@core/infrastructure/http/pagination.dto';
+import { Page } from '@core/domain/page';
 import { DomainException } from '@core/domain/domain.exception';
 import { ErrorCodes } from '@core/domain/error-codes';
 
@@ -36,6 +40,20 @@ export class UserController {
     private readonly userService: UserService,
     private readonly roleService: RoleService,
   ) {}
+
+  @Get()
+  @RequirePermission('user.read')
+  @ApiOperation({
+    summary: 'List institution users with their roles (paginated)',
+  })
+  @ApiOkResponse({ description: 'Paginated users with their roles' })
+  @ApiErrors(401, 403)
+  public async findAll(
+    @Query() query: PaginationDto,
+  ): Promise<Page<UserListItem>> {
+    const result = await this.userService.findAllUsers(query);
+    return result.value;
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -80,15 +98,39 @@ export class UserController {
     return result.value;
   }
 
+  @Patch(':userId')
+  @RequirePermission('user.update')
+  @ApiOperation({ summary: 'Update a user profile (admin)' })
+  @ApiOkResponse({ type: UserProfileDto })
+  @ApiErrors(401, 403, 404, 422)
+  public async updateUser(
+    @Param('userId') userId: string,
+    @Body() body: UpdateProfileDto,
+  ): Promise<UserProfileDto> {
+    const result = await this.userService.updateProfile(userId, body);
+    if (result.isFailure) {
+      const errorMessage = result.error as string;
+      if (errorMessage.includes('not found')) {
+        throw new DomainException(ErrorCodes.ERR_USER_NOT_FOUND, errorMessage);
+      }
+      throw new DomainException(
+        ErrorCodes.ERR_USER_UPDATE_FAILED,
+        errorMessage,
+      );
+    }
+    return result.value;
+  }
+
   @Post()
   @RequirePermission('user.create')
-  @ApiOperation({ summary: 'Create a new user' })
+  @ApiOperation({ summary: 'Create a new user (optionally with roles)' })
   @ApiErrors(401, 403, 422)
   public async create(@Body() body: CreateUserDto): Promise<{
     id: string;
     email: string;
     firstName: string;
     lastName: string;
+    roles: string[];
   }> {
     const result = await this.userService.createUser(body);
     if (result.isFailure) {
@@ -101,6 +143,12 @@ export class UserController {
       }
       if (errorMessage.includes('CI')) {
         throw new DomainException(ErrorCodes.ERR_USER_CI_EXISTS, errorMessage);
+      }
+      if (errorMessage.includes('role IDs')) {
+        throw new DomainException(
+          ErrorCodes.ERR_ROLE_ASSIGNMENT_FAILED,
+          errorMessage,
+        );
       }
       throw new DomainException(
         ErrorCodes.ERR_USER_CREATION_FAILED,

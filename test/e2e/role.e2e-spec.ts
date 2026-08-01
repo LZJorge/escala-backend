@@ -91,7 +91,7 @@ describe('Roles', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['role.create'],
+        ['role.create', 'role.read'],
         'creator',
       );
 
@@ -142,7 +142,7 @@ describe('Roles', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['role.update'],
+        ['role.update', 'role.read'],
         'updater',
       );
 
@@ -170,22 +170,22 @@ describe('Roles', () => {
       await request(app.getHttpServer())
         .patch(`/roles/${role.id}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ permissionCodes: ['course.delete'] })
+        .send({ permissionCodes: ['course.delete', 'course.read'] })
         .expect(200);
 
       const remaining = await prisma.rolePermission.findMany({
         where: { roleId: role.id },
         include: { permission: true },
       });
-      const codes = remaining.map((rp) => rp.permission.code);
-      expect(codes).toEqual(['course.delete']);
+      const codes = remaining.map((rp) => rp.permission.code).sort();
+      expect(codes).toEqual(['course.delete', 'course.read']);
     });
 
     it('returns 422 when patching an immutable role', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['role.update'],
+        ['role.update', 'role.read'],
         'immutable-updater',
       );
 
@@ -213,7 +213,7 @@ describe('Roles', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['role.delete'],
+        ['role.delete', 'role.read'],
         'immutable-deleter',
       );
 

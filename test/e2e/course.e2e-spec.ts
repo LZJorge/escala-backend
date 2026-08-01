@@ -88,7 +88,7 @@ describe('Courses', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['course.update'],
+        ['course.update', 'course.read'],
         'prereq',
       );
 
@@ -149,7 +149,7 @@ describe('Courses', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['course.update'],
+        ['course.update', 'course.read'],
         'credits',
       );
 

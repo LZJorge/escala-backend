@@ -2,9 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes, scryptSync } from 'node:crypto';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
 import { Result } from '@core/domain/result';
+import { Page } from '@core/domain/page';
 import { User } from '@core/domain/user.entity';
 import { USER_REPOSITORY } from '../domain/user.repository';
-import type { UserRepository } from '../domain/user.repository';
+import type { UserRepository, UserListItem } from '../domain/user.repository';
 
 @Injectable()
 export class UserService {
@@ -13,6 +14,28 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly prisma: PrismaService,
   ) {}
+
+  public async findAllUsers(params: {
+    page: number;
+    pageSize: number;
+  }): Promise<Result<Page<UserListItem>>> {
+    const [users, total] = await Promise.all([
+      this.userRepository.findAll({
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      this.userRepository.count(),
+    ]);
+    return Result.ok({
+      meta: {
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+        totalPages: Math.ceil(total / params.pageSize),
+      },
+      data: users,
+    });
+  }
 
   public async getMe(jwt: {
     sub: string;
@@ -161,12 +184,14 @@ export class UserService {
     lastName: string;
     ci: string;
     phone?: string;
+    roleIds?: string[];
   }): Promise<
     Result<{
       id: string;
       email: string;
       firstName: string;
       lastName: string;
+      roles: string[];
     }>
   > {
     const [existingEmail, existingCi] = await Promise.all([
@@ -193,13 +218,34 @@ export class UserService {
       phone: params.phone ?? null,
     });
 
+    let roleNames: string[] = [];
+    if (params.roleIds?.length) {
+      const roles = await this.prisma.role.findMany({
+        where: { id: { in: params.roleIds } },
+      });
+      if (roles.length !== params.roleIds.length) {
+        return Result.fail('One or more role IDs are invalid');
+      }
+      roleNames = roles.map((r: { name: string }) => r.name);
+    }
+
     await this.userRepository.save(user);
+
+    if (params.roleIds?.length) {
+      await this.prisma.userRole.createMany({
+        data: params.roleIds.map((roleId: string) => ({
+          userId: user.id,
+          roleId,
+        })),
+      });
+    }
 
     return Result.ok({
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      roles: roleNames,
     });
   }
 

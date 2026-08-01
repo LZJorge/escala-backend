@@ -127,6 +127,35 @@ describe('Auth', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
+    it('returns 401 for a soft-deleted user', async () => {
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('user_password', salt, 64).toString('hex');
+
+      await prisma.user.create({
+        data: {
+          email: 'deleted@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Deleted',
+          lastName: 'User',
+          ci: '99999999',
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'deleted@test.edu', password: 'user_password' })
+        .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_INVALID_CREDENTIALS,
+        path: '/auth/login',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
     it('returns 400 for empty credentials', async () => {
       const response = await request(app.getHttpServer())
         .post('/auth/login')
