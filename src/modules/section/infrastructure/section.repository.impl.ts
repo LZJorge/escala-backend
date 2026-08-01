@@ -58,12 +58,9 @@ export class PrismaSectionRepository implements SectionRepository {
     return term?.status ?? null;
   }
 
-  public async isTeacher(userId: string): Promise<boolean> {
-    const record = await this.prisma.userRole.findFirst({
-      where: {
-        userId,
-        role: { isStudent: false },
-      },
+  public async isTeacher(teacherId: string): Promise<boolean> {
+    const record = await this.prisma.adminProfile.findUnique({
+      where: { id: teacherId },
     });
 
     return record !== null;

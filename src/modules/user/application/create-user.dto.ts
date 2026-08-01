@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
+  IsIn,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -38,8 +39,18 @@ export class CreateUserDto {
   public readonly phone?: string;
 
   @ApiPropertyOptional({
+    example: ['ADMIN'],
+    description: 'Profiles to create: ADMIN (staff/teacher), STUDENT',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['ADMIN', 'STUDENT'], { each: true })
+  public readonly profiles?: Array<'ADMIN' | 'STUDENT'>;
+
+  @ApiPropertyOptional({
     example: ['role-uuid-1'],
-    description: 'Role IDs to assign on creation',
+    description:
+      'Role IDs to assign on creation (applied to the ADMIN profile)',
   })
   @IsOptional()
   @IsArray()

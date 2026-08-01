@@ -48,6 +48,9 @@ export class UserService {
       type: 'SUPER_ADMIN' | 'USER';
       firstName?: string;
       lastName?: string;
+      profiles?: Array<'ADMIN' | 'STUDENT'>;
+      studentProfileId?: string | null;
+      adminProfileId?: string | null;
       roles?: string[];
       permissions: string[];
     }>
@@ -70,12 +73,17 @@ export class UserService {
     const record = await this.prisma.user.findUnique({
       where: { id: jwt.sub },
       include: {
-        roles: {
+        studentProfile: true,
+        adminProfile: {
           include: {
-            role: {
+            roles: {
               include: {
-                permissions: {
-                  include: { permission: true },
+                role: {
+                  include: {
+                    permissions: {
+                      include: { permission: true },
+                    },
+                  },
                 },
               },
             },
@@ -87,22 +95,29 @@ export class UserService {
       return Result.fail('User not found');
     }
 
+    const roles = record.adminProfile?.roles ?? [];
     return Result.ok({
       id: record.id,
       email: record.email,
       firstName: record.firstName,
       lastName: record.lastName,
       type: 'USER',
-      roles: record.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      profiles: [
+        ...(record.adminProfile ? (['ADMIN'] as const) : []),
+        ...(record.studentProfile ? (['STUDENT'] as const) : []),
+      ],
+      studentProfileId: record.studentProfile?.id ?? null,
+      adminProfileId: record.adminProfile?.id ?? null,
+      roles: roles.map((ar: { role: { name: string } }) => ar.role.name),
       permissions: [
         ...new Set(
-          record.roles.flatMap(
-            (ur: {
+          roles.flatMap(
+            (ar: {
               role: {
                 permissions: Array<{ permission: { code: string } }>;
               };
             }) =>
-              ur.role.permissions.map(
+              ar.role.permissions.map(
                 (rp: { permission: { code: string } }) => rp.permission.code,
               ),
           ),
@@ -185,13 +200,17 @@ export class UserService {
     ci: string;
     phone?: string;
     roleIds?: string[];
+    profiles?: Array<'ADMIN' | 'STUDENT'>;
   }): Promise<
     Result<{
       id: string;
       email: string;
       firstName: string;
       lastName: string;
+      profiles: Array<'ADMIN' | 'STUDENT'>;
       roles: string[];
+      studentProfileId: string | null;
+      adminProfileId: string | null;
     }>
   > {
     const [existingEmail, existingCi] = await Promise.all([
@@ -218,26 +237,40 @@ export class UserService {
       phone: params.phone ?? null,
     });
 
-    let roleNames: string[] = [];
+    let roleRows: Array<{ id: string; name: string }> = [];
     if (params.roleIds?.length) {
-      const roles = await this.prisma.role.findMany({
+      roleRows = await this.prisma.role.findMany({
         where: { id: { in: params.roleIds } },
       });
-      if (roles.length !== params.roleIds.length) {
+      if (roleRows.length !== params.roleIds.length) {
         return Result.fail('One or more role IDs are invalid');
       }
-      roleNames = roles.map((r: { name: string }) => r.name);
     }
 
     await this.userRepository.save(user);
 
-    if (params.roleIds?.length) {
-      await this.prisma.userRole.createMany({
-        data: params.roleIds.map((roleId: string) => ({
+    let studentProfileId: string | null = null;
+    let adminProfileId: string | null = null;
+
+    const wantsAdmin =
+      params.profiles?.includes('ADMIN') ?? roleRows.length > 0;
+    if (wantsAdmin) {
+      const adminProfile = await this.prisma.adminProfile.create({
+        data: {
           userId: user.id,
-          roleId,
-        })),
+          roles: {
+            create: roleRows.map((r: { id: string }) => ({ roleId: r.id })),
+          },
+        },
       });
+      adminProfileId = adminProfile.id;
+    }
+
+    if (params.profiles?.includes('STUDENT')) {
+      const studentProfile = await this.prisma.studentProfile.create({
+        data: { userId: user.id },
+      });
+      studentProfileId = studentProfile.id;
     }
 
     return Result.ok({
@@ -245,7 +278,13 @@ export class UserService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      roles: roleNames,
+      profiles: [
+        ...(adminProfileId ? (['ADMIN'] as const) : []),
+        ...(studentProfileId ? (['STUDENT'] as const) : []),
+      ],
+      roles: roleRows.map((r: { name: string }) => r.name),
+      studentProfileId,
+      adminProfileId,
     });
   }
 

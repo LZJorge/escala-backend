@@ -19,11 +19,17 @@ export class PrismaUserRepository implements UserRepository {
       ci: string;
       phone: string | null;
       isActive: boolean;
-      roles: Array<{ role: { name: string } }>;
+      adminProfile: {
+        roles: Array<{ role: { name: string } }>;
+      } | null;
     };
 
     const records = await this.prisma.user.findMany({
-      include: { roles: { include: { role: true } } },
+      include: {
+        adminProfile: {
+          include: { roles: { include: { role: true } } },
+        },
+      },
       orderBy: { createdAt: 'asc' },
       skip: params.skip,
       take: params.take,
@@ -37,7 +43,10 @@ export class PrismaUserRepository implements UserRepository {
       ci: r.ci,
       phone: r.phone,
       isActive: r.isActive,
-      roles: r.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      roles:
+        r.adminProfile?.roles.map(
+          (ar: { role: { name: string } }) => ar.role.name,
+        ) ?? [],
     }));
   }
 

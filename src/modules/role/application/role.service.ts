@@ -20,6 +20,13 @@ export class RoleService {
       permissionCodes: string[];
     }>
   > {
+    const nameInUse = await this.prisma.role.findFirst({
+      where: { name: params.name },
+    });
+    if (nameInUse) {
+      return Result.fail('Role name already in use');
+    }
+
     const permissions = await this.prisma.permission.findMany({
       where: { code: { in: params.permissionCodes } },
     });
@@ -34,7 +41,6 @@ export class RoleService {
 
     const role = new Role({
       name: params.name,
-      isStudent: false,
       isEditable: true,
     });
 
@@ -43,7 +49,6 @@ export class RoleService {
         data: {
           id: role.id,
           name: role.name,
-          isStudent: false,
           isEditable: true,
         },
       });
@@ -67,7 +72,6 @@ export class RoleService {
       Page<{
         id: string;
         name: string;
-        isStudent: boolean;
         isEditable: boolean;
         permissionCodes: string[];
       }>
@@ -94,13 +98,11 @@ export class RoleService {
         (r: {
           id: string;
           name: string;
-          isStudent: boolean;
           isEditable: boolean;
           permissions: Array<{ permission: { code: string } }>;
         }) => ({
           id: r.id,
           name: r.name,
-          isStudent: r.isStudent,
           isEditable: r.isEditable,
           permissionCodes: r.permissions.map(
             (rp: { permission: { code: string } }) => rp.permission.code,
@@ -114,7 +116,6 @@ export class RoleService {
     Result<{
       id: string;
       name: string;
-      isStudent: boolean;
       isEditable: boolean;
       permissionCodes: string[];
     }>
@@ -130,7 +131,6 @@ export class RoleService {
     return Result.ok({
       id: role.id,
       name: role.name,
-      isStudent: role.isStudent,
       isEditable: role.isEditable,
       permissionCodes: role.permissions.map(
         (rp: { permission: { code: string } }) => rp.permission.code,
@@ -156,6 +156,15 @@ export class RoleService {
     }
     if (!existing.isEditable) {
       return Result.fail('Built-in roles cannot be modified');
+    }
+
+    if (params.name && params.name !== existing.name) {
+      const nameInUse = await this.prisma.role.findFirst({
+        where: { name: params.name },
+      });
+      if (nameInUse) {
+        return Result.fail('Role name already in use');
+      }
     }
 
     let permissionCodes = params.permissionCodes;
@@ -236,15 +245,29 @@ export class RoleService {
       return Result.fail('Role not found');
     }
 
-    const exists = await this.prisma.userRole.findUnique({
-      where: { userId_roleId: { userId, roleId } },
+    let adminProfile = await this.prisma.adminProfile.findUnique({
+      where: { userId },
+    });
+    if (!adminProfile) {
+      adminProfile = await this.prisma.adminProfile.create({
+        data: { userId },
+      });
+    }
+
+    const exists = await this.prisma.adminRole.findUnique({
+      where: {
+        adminProfileId_roleId: {
+          adminProfileId: adminProfile.id,
+          roleId,
+        },
+      },
     });
     if (exists) {
       return Result.fail('User already has this role');
     }
 
-    await this.prisma.userRole.create({
-      data: { userId, roleId },
+    await this.prisma.adminRole.create({
+      data: { adminProfileId: adminProfile.id, roleId },
     });
 
     return Result.ok(undefined);
@@ -261,8 +284,20 @@ export class RoleService {
       return Result.fail('Role not found');
     }
 
-    await this.prisma.userRole.delete({
-      where: { userId_roleId: { userId, roleId } },
+    const adminProfile = await this.prisma.adminProfile.findUnique({
+      where: { userId },
+    });
+    if (!adminProfile) {
+      return Result.fail('Role not found');
+    }
+
+    await this.prisma.adminRole.delete({
+      where: {
+        adminProfileId_roleId: {
+          adminProfileId: adminProfile.id,
+          roleId,
+        },
+      },
     });
 
     return Result.ok(undefined);

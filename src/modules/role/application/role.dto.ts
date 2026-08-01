@@ -37,9 +37,6 @@ export class RoleResponseDto {
   public readonly name: string;
 
   @ApiProperty()
-  public readonly isStudent: boolean;
-
-  @ApiProperty()
   public readonly isEditable: boolean;
 
   @ApiProperty({ type: [String] })

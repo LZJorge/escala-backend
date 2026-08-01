@@ -23,6 +23,10 @@ export class AuthService {
         lastName: string;
         mustChangePassword: boolean;
         roleType: 'SUPER_ADMIN' | 'USER';
+        profiles?: Array<'ADMIN' | 'STUDENT'>;
+        adminRoles?: string[];
+        studentProfileId?: string | null;
+        adminProfileId?: string | null;
       };
     }>
   > {
@@ -68,11 +72,13 @@ export class AuthService {
       });
     }
 
-    const user = await this.authRepository.findByEmail(params.email);
+    const authUser = await this.authRepository.findByEmail(params.email);
 
-    if (!user) {
+    if (!authUser) {
       return Result.fail('Invalid email or password');
     }
+
+    const user = authUser.user;
 
     const [salt, storedHash] = user.password.split(':');
     const hashBuf = scryptSync(params.password, salt, 64);
@@ -90,6 +96,10 @@ export class AuthService {
       email: user.email,
       mustChangePassword: false,
       roleType: 'USER',
+      profiles: authUser.profiles,
+      adminRoles: authUser.adminRoles,
+      studentProfileId: authUser.studentProfileId,
+      adminProfileId: authUser.adminProfileId,
     };
 
     const accessToken = this.jwtService.sign(jwtPayload);
@@ -103,6 +113,10 @@ export class AuthService {
         lastName: user.lastName,
         mustChangePassword: false,
         roleType: 'USER',
+        profiles: authUser.profiles,
+        adminRoles: authUser.adminRoles,
+        studentProfileId: authUser.studentProfileId,
+        adminProfileId: authUser.adminProfileId,
       },
     });
   }

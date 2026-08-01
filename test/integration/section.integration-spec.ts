@@ -137,7 +137,7 @@ describe('Section (e2e)', () => {
     sectionRepoMock.getTermStatus.mockResolvedValue('ACTIVE');
     sectionRepoMock.isTeacher.mockResolvedValue(true);
 
-    prismaMock.userRole.findMany.mockResolvedValue([
+    prismaMock.adminRole.findMany.mockResolvedValue([
       {
         role: {
           permissions: [

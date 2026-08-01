@@ -66,6 +66,9 @@ export class UserController {
     type: 'SUPER_ADMIN' | 'USER';
     firstName?: string;
     lastName?: string;
+    profiles?: Array<'ADMIN' | 'STUDENT'>;
+    studentProfileId?: string | null;
+    adminProfileId?: string | null;
     roles?: string[];
     permissions: string[];
   }> {
@@ -130,7 +133,10 @@ export class UserController {
     email: string;
     firstName: string;
     lastName: string;
+    profiles: Array<'ADMIN' | 'STUDENT'>;
     roles: string[];
+    studentProfileId: string | null;
+    adminProfileId: string | null;
   }> {
     const result = await this.userService.createUser(body);
     if (result.isFailure) {

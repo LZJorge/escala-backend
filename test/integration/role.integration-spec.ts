@@ -50,7 +50,7 @@ describe('Role (e2e)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    prismaMock.userRole.findMany.mockResolvedValue([
+    prismaMock.adminRole.findMany.mockResolvedValue([
       {
         role: {
           permissions: [

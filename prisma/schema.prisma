@@ -82,21 +82,43 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  roles                 UserRole[]
-  sectionsTaught        CourseSection[]        @relation("TeacherSections")
-  enrollments           Enrollment[]           @relation("StudentEnrollments")
-  assessmentSubmissions AssessmentSubmission[] @relation("StudentSubmissions")
-  transcripts           Transcript[]           @relation("StudentTranscripts")
+  adminProfile   AdminProfile?
+  studentProfile StudentProfile?
 
   @@map("users")
 }
 
+model AdminProfile {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String  @unique @map("user_id") @db.Uuid
+  department String?
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles          AdminRole[]
+  sectionsTaught CourseSection[] @relation("TeacherSections")
+
+  @@map("admin_profiles")
+}
+
+model StudentProfile {
+  id             String  @id @default(uuid()) @db.Uuid
+  userId         String  @unique @map("user_id") @db.Uuid
+  enrollmentYear Int?    @map("enrollment_year")
+
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments           Enrollment[]           @relation("StudentEnrollments")
+  assessmentSubmissions AssessmentSubmission[] @relation("StudentSubmissions")
+  transcripts           Transcript[]           @relation("StudentTranscripts")
+
+  @@map("student_profiles")
+}
+
 model SuperAdmin {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  password     String   @map("password")
-  mustChangePassword Boolean  @default(true)  @map("must_change_password") 
-  createdAt    DateTime @default(now()) @map("created_at")
+  id                 String   @id @default(uuid()) @db.Uuid
+  email              String   @unique
+  password           String   @map("password")
+  mustChangePassword Boolean  @default(true) @map("must_change_password")
+  createdAt          DateTime @default(now()) @map("created_at")
 
   @@map("super_admins")
 }
@@ -104,21 +126,20 @@ model SuperAdmin {
 /* Scopes authorization levels to support custom organizational structures */
 model Role {
   id         String   @id @default(uuid()) @db.Uuid
-  name       String
-  isStudent  Boolean  @default(false) @map("is_student")
+  name       String   @unique
   isEditable Boolean  @default(true) @map("is_editable")
   createdAt  DateTime @default(now()) @map("created_at")
 
   permissions RolePermission[]
-  users       UserRole[]
+  admins      AdminRole[]
 
   @@map("roles")
 }
 
 model Permission {
   id          String  @id @default(uuid()) @db.Uuid
-  code        String  @unique 
-  module      String 
+  code        String  @unique
+  module      String
   description String?
 
   roles RolePermission[]
@@ -139,16 +160,16 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-model UserRole {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  roleId String @map("role_id") @db.Uuid
+model AdminRole {
+  id             String @id @default(uuid()) @db.Uuid
+  adminProfileId String @map("admin_profile_id") @db.Uuid
+  roleId         String @map("role_id") @db.Uuid
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  adminProfile AdminProfile @relation(fields: [adminProfileId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, roleId])
-  @@map("user_roles")
+  @@unique([adminProfileId, roleId])
+  @@map("admin_roles")
 }
 
 model Program {
@@ -169,7 +190,7 @@ model Program {
 model Course {
   id        String    @id @default(uuid()) @db.Uuid
   programId String    @map("program_id") @db.Uuid
-  code      String 
+  code      String
   name      String
   credits   Int
   termLevel Int       @map("term_level")
@@ -205,7 +226,7 @@ model CoursePrerequisite {
 
 model Term {
   id        String     @id @default(uuid()) @db.Uuid
-  name      String 
+  name      String
   startDate DateTime   @map("start_date")
   endDate   DateTime   @map("end_date")
   status    TermStatus @default(UPCOMING)
@@ -223,13 +244,13 @@ model CourseSection {
   courseId  String    @map("course_id") @db.Uuid
   termId    String    @map("term_id") @db.Uuid
   teacherId String    @map("teacher_id") @db.Uuid
-  name      String 
+  name      String
   capacity  Int
   deletedAt DateTime? @map("deleted_at")
 
   course      Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
   term        Term              @relation(fields: [termId], references: [id], onDelete: Cascade)
-  teacher     User              @relation("TeacherSections", fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher     AdminProfile      @relation("TeacherSections", fields: [teacherId], references: [id], onDelete: Cascade)
   schedules   SectionSchedule[]
   enrollments Enrollment[]
   assessments Assessment[]
@@ -259,8 +280,8 @@ model Enrollment {
   status     EnrollmentStatus @default(ENROLLED)
   enrolledAt DateTime         @default(now()) @map("enrolled_at")
 
-  section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  student User          @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+  section CourseSection  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([sectionId, studentId])
   @@map("enrollments")
@@ -286,14 +307,14 @@ model AssessmentSubmission {
   id              String   @id @default(uuid()) @db.Uuid
   assessmentId    String   @map("assessment_id") @db.Uuid
   studentId       String   @map("student_id") @db.Uuid
-  fileUrl         String   @map("file_url") 
+  fileUrl         String   @map("file_url")
   fileType        FileType @map("file_type")
   submittedAt     DateTime @default(now()) @map("submitted_at")
-  grade           Decimal? @db.Decimal(4, 2) 
+  grade           Decimal? @db.Decimal(4, 2)
   teacherFeedback String?  @map("teacher_feedback")
 
-  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  student    User       @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+  assessment Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    StudentProfile @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([assessmentId, studentId])
   @@map("assessment_submissions")
@@ -305,13 +326,13 @@ model Transcript {
   studentId  String           @map("student_id") @db.Uuid
   courseId   String           @map("course_id") @db.Uuid
   termId     String           @map("term_id") @db.Uuid
-  finalGrade Decimal          @map("final_grade") @db.Decimal(4, 2) 
+  finalGrade Decimal          @map("final_grade") @db.Decimal(4, 2)
   status     TranscriptStatus
   createdAt  DateTime         @default(now()) @map("created_at")
 
-  student User   @relation("StudentTranscripts", fields: [studentId], references: [id], onDelete: Cascade)
-  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  term    Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  student StudentProfile @relation("StudentTranscripts", fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  term    Term           @relation(fields: [termId], references: [id], onDelete: Cascade)
 
   @@map("transcripts")
 }

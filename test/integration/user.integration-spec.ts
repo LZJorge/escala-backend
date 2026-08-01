@@ -92,17 +92,21 @@ describe('User (e2e)', () => {
         email: 'user@example.com',
         firstName: 'Test',
         lastName: 'User',
-        roles: [
-          {
-            role: {
-              name: 'Editor',
-              permissions: [
-                { permission: { code: 'course.create' } },
-                { permission: { code: 'course.read' } },
-              ],
+        adminProfile: {
+          id: 'admin-profile-id',
+          roles: [
+            {
+              role: {
+                name: 'Editor',
+                permissions: [
+                  { permission: { code: 'course.create' } },
+                  { permission: { code: 'course.read' } },
+                ],
+              },
             },
-          },
-        ],
+          ],
+        },
+        studentProfile: null,
       });
 
       const response = await request(app.getHttpServer())
@@ -114,6 +118,8 @@ describe('User (e2e)', () => {
         id: 'test-user-id',
         email: 'user@example.com',
         type: 'USER',
+        profiles: ['ADMIN'],
+        adminProfileId: 'admin-profile-id',
       });
       expect(response.body.data.roles).toEqual(['Editor']);
       expect(response.body.data.permissions).toEqual(
@@ -190,7 +196,7 @@ describe('User (e2e)', () => {
 
   describe('GET /users', () => {
     it('returns 200 with users and their roles for user.read permission', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [{ permission: { code: 'user.read' } }],
@@ -238,7 +244,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 403 without user.read permission', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([]);
+      prismaMock.adminRole.findMany.mockResolvedValue([]);
 
       const response = await request(app.getHttpServer())
         .get('/users')
@@ -297,7 +303,7 @@ describe('User (e2e)', () => {
     };
 
     it('returns 201 when user is created', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -323,7 +329,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 422 when email already exists', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -354,7 +360,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 403 without user.create permission', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [{ permission: { code: 'role.read' } }],
@@ -377,7 +383,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 403 with user.create but no user.read', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [{ permission: { code: 'user.create' } }],
@@ -413,7 +419,7 @@ describe('User (e2e)', () => {
     });
 
     it('creates user with roles and returns them', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -430,7 +436,9 @@ describe('User (e2e)', () => {
       prismaMock.role.findMany.mockResolvedValue([
         { id: 'role-1', name: 'Editor' },
       ]);
-      prismaMock.userRole.createMany.mockResolvedValue({ count: 1 });
+      prismaMock.adminProfile.create.mockResolvedValue({
+        id: 'admin-profile-id',
+      });
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -439,13 +447,17 @@ describe('User (e2e)', () => {
         .expect(201);
 
       expect(response.body.data.roles).toEqual(['Editor']);
-      expect(prismaMock.userRole.createMany).toHaveBeenCalledWith({
-        data: [{ userId: expect.any(String), roleId: 'role-1' }],
+      expect(response.body.data.profiles).toEqual(['ADMIN']);
+      expect(prismaMock.adminProfile.create).toHaveBeenCalledWith({
+        data: {
+          userId: expect.any(String),
+          roles: { create: [{ roleId: 'role-1' }] },
+        },
       });
     });
 
     it('returns 422 when a role ID is invalid', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -478,7 +490,7 @@ describe('User (e2e)', () => {
 
   describe('PATCH /users/:userId', () => {
     it('returns 200 when admin updates a user', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -502,7 +514,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 404 when user not found', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -530,7 +542,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 403 without user.update permission', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([]);
+      prismaMock.adminRole.findMany.mockResolvedValue([]);
 
       const response = await request(app.getHttpServer())
         .patch('/users/target-user-id')
@@ -548,7 +560,7 @@ describe('User (e2e)', () => {
 
   describe('DELETE /users/:userId', () => {
     it('returns 200 when user is soft deleted', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -569,7 +581,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 404 when user not found', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -598,7 +610,7 @@ describe('User (e2e)', () => {
 
   describe('POST /users/:userId/roles', () => {
     it('returns 201 when role is assigned', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -615,8 +627,10 @@ describe('User (e2e)', () => {
         isStudent: false,
         isEditable: true,
       });
-      prismaMock.userRole.findUnique.mockResolvedValue(null);
-      prismaMock.userRole.create.mockResolvedValue({ id: 'ur-id' });
+      prismaMock.adminProfile.findUnique.mockResolvedValue(null);
+      prismaMock.adminProfile.create.mockResolvedValue({ id: 'ap-id' });
+      prismaMock.adminRole.findUnique.mockResolvedValue(null);
+      prismaMock.adminRole.create.mockResolvedValue({ id: 'ur-id' });
 
       await request(app.getHttpServer())
         .post('/users/user-id/roles')
@@ -626,7 +640,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 422 when role not found', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -656,7 +670,7 @@ describe('User (e2e)', () => {
 
   describe('DELETE /users/:userId/roles/:roleId', () => {
     it('returns 200 when role is unassigned', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [
@@ -673,7 +687,8 @@ describe('User (e2e)', () => {
         isStudent: false,
         isEditable: true,
       });
-      prismaMock.userRole.delete.mockResolvedValue({ id: 'ur-id' });
+      prismaMock.adminProfile.findUnique.mockResolvedValue({ id: 'ap-id' });
+      prismaMock.adminRole.delete.mockResolvedValue({ id: 'ur-id' });
 
       await request(app.getHttpServer())
         .delete('/users/user-id/roles/role-id')
@@ -682,7 +697,7 @@ describe('User (e2e)', () => {
     });
 
     it('returns 422 when role not found', async () => {
-      prismaMock.userRole.findMany.mockResolvedValue([
+      prismaMock.adminRole.findMany.mockResolvedValue([
         {
           role: {
             permissions: [

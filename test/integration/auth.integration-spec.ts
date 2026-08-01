@@ -90,13 +90,19 @@ describe('Auth (e2e)', () => {
     it('returns 200 with JWT for valid regular user credentials', async () => {
       authRepositoryMock.findSuperAdminByEmail.mockResolvedValue(null);
       authRepositoryMock.findByEmail.mockResolvedValue({
-        id: 'user-id',
-        email: 'user@institution.edu',
-        password: `${VALID_SALT}:${VALID_HASH}`,
-        firstName: 'Regular',
-        lastName: 'User',
-        ci: '11111111',
-        phone: null,
+        user: {
+          id: 'user-id',
+          email: 'user@institution.edu',
+          password: `${VALID_SALT}:${VALID_HASH}`,
+          firstName: 'Regular',
+          lastName: 'User',
+          ci: '11111111',
+          phone: null,
+        },
+        profiles: ['ADMIN'],
+        adminRoles: ['Editor'],
+        studentProfileId: null,
+        adminProfileId: 'admin-profile-id',
       });
 
       const response = await request(app.getHttpServer())
@@ -106,6 +112,8 @@ describe('Auth (e2e)', () => {
 
       expect(response.body.data).toHaveProperty('accessToken');
       expect(response.body.data.user.roleType).toBe('USER');
+      expect(response.body.data.user.profiles).toEqual(['ADMIN']);
+      expect(response.body.data.user.adminProfileId).toBe('admin-profile-id');
     });
 
     it('returns 401 when email does not exist', async () => {
