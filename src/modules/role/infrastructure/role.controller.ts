@@ -42,9 +42,16 @@ export class RoleController {
   ): Promise<{ id: string; name: string; permissionCodes: string[] }> {
     const result = await this.roleService.create(body);
     if (result.isFailure) {
+      const errorMessage = result.error as string;
+      if (errorMessage.includes('name already in use')) {
+        throw new DomainException(
+          ErrorCodes.ERR_ROLE_NAME_EXISTS,
+          errorMessage,
+        );
+      }
       throw new DomainException(
         ErrorCodes.ERR_ROLE_CREATION_FAILED,
-        result.error as string,
+        errorMessage,
       );
     }
     return result.value;
@@ -90,9 +97,16 @@ export class RoleController {
   ): Promise<{ id: string; name: string; permissionCodes: string[] }> {
     const result = await this.roleService.update(roleId, body);
     if (result.isFailure) {
+      const errorMessage = result.error as string;
+      if (errorMessage.includes('name already in use')) {
+        throw new DomainException(
+          ErrorCodes.ERR_ROLE_NAME_EXISTS,
+          errorMessage,
+        );
+      }
       throw new DomainException(
         ErrorCodes.ERR_ROLE_UPDATE_FAILED,
-        result.error as string,
+        errorMessage,
       );
     }
     return result.value;
