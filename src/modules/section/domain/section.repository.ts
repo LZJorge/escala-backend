@@ -21,6 +21,7 @@ export interface SectionWithSchedules {
 export interface SectionRepository {
   getTermStatus(termId: string): Promise<string | null>;
   isTeacher(userId: string): Promise<boolean>;
+  isCourseAvailable(courseId: string): Promise<boolean>;
   create(section: CourseSection): Promise<CourseSection>;
   createSchedules(schedules: SectionSchedule[]): Promise<SectionSchedule[]>;
   findAll(filters: {

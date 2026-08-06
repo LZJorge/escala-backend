@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
+import { Prisma } from '@prisma/client';
 import { DomainException } from '@core/domain/domain.exception';
 import { ErrorCodes } from '@core/domain/error-codes';
 import type { ErrorResponse } from './envelope-response.type';
@@ -58,6 +59,13 @@ export class ExceptionFilter implements NestExceptionFilter {
           message = 'Internal server error';
         }
       }
+    } else if (
+      exception instanceof Prisma.PrismaClientKnownRequestError &&
+      exception.code === 'P2003'
+    ) {
+      statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
+      errorCode = ErrorCodes.ERR_RESOURCE_NOT_FOUND;
+      message = 'Referenced resource does not exist';
     } else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       errorCode = ErrorCodes.SYS_INTERNAL_ERROR;

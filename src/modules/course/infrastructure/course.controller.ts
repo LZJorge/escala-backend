@@ -20,7 +20,6 @@ import {
   CreateCourseDto,
   UpdateCourseDto,
   SetPrerequisitesDto,
-  PrerequisiteEntryDto,
   CourseResponseDto,
 } from '../application/course.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
@@ -43,6 +42,12 @@ export class CourseController {
     const result = await this.service.create(body);
 
     if (result.isFailure) {
+      if (result.error === 'Program not found') {
+        throw new DomainException(
+          ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+          result.error,
+        );
+      }
       throw new DomainException(
         ErrorCodes.ERR_COURSE_CREATION_FAILED,
         result.error as string,
@@ -96,6 +101,12 @@ export class CourseController {
     const result = await this.service.update(courseId, body);
 
     if (result.isFailure) {
+      if (result.error === 'Course not found') {
+        throw new DomainException(
+          ErrorCodes.ERR_COURSE_NOT_FOUND,
+          result.error,
+        );
+      }
       throw new DomainException(
         ErrorCodes.ERR_COURSE_UPDATE_FAILED,
         result.error as string,
@@ -139,15 +150,38 @@ export class CourseController {
     @Param('courseId') courseId: string,
     @Body() body: SetPrerequisitesDto,
   ): Promise<{ courseId: string; prerequisiteCount: number }> {
-    const mapped = body.prerequisites.map((p: PrerequisiteEntryDto) => ({
-      requiredCourseId: p.requiredCourseId ?? null,
-      requiredCredits: p.requiredCredits ?? null,
-    }));
+    const seen = new Set<string | number>();
+    const mapped: Array<{
+      requiredCourseId: string | null;
+      requiredCredits: number | null;
+    }> = [];
+    for (const p of body.prerequisites) {
+      const key = p.requiredCourseId ?? p.requiredCredits;
+
+      if (key !== undefined && seen.has(key)) {
+        continue;
+      }
+
+      if (key !== undefined) {
+        seen.add(key);
+      }
+
+      mapped.push({
+        requiredCourseId: p.requiredCourseId ?? null,
+        requiredCredits: p.requiredCredits ?? null,
+      });
+    }
     const result = await this.service.setPrerequisites(courseId, mapped);
 
     if (result.isFailure) {
+      if (result.error === 'Course not found') {
+        throw new DomainException(
+          ErrorCodes.ERR_COURSE_NOT_FOUND,
+          result.error,
+        );
+      }
       throw new DomainException(
-        ErrorCodes.ERR_COURSE_NOT_FOUND,
+        ErrorCodes.ERR_COURSE_PREREQ_INVALID,
         result.error as string,
       );
     }

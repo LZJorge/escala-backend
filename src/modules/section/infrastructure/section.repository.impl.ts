@@ -66,6 +66,15 @@ export class PrismaSectionRepository implements SectionRepository {
     return record !== null;
   }
 
+  public async isCourseAvailable(courseId: string): Promise<boolean> {
+    const record = await this.prisma.course.findUnique({
+      where: { id: courseId, deletedAt: null },
+      select: { id: true },
+    });
+
+    return record !== null;
+  }
+
   public async create(section: CourseSection): Promise<CourseSection> {
     const record = await this.prisma.courseSection.create({
       data: {

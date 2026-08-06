@@ -12,6 +12,7 @@ export interface CourseRepository {
   create(course: Course): Promise<Course>;
   findAllByProgram(programId: string): Promise<Course[]>;
   findById(id: string): Promise<Course | null>;
+  programExists(programId: string): Promise<boolean>;
   update(course: Course): Promise<Course>;
   softDelete(id: string): Promise<void>;
   getPrerequisites(courseId: string): Promise<CoursePrerequisiteRow[]>;
@@ -22,4 +23,6 @@ export interface CourseRepository {
     courseId: string,
     prerequisites: Omit<CoursePrerequisiteRow, 'courseId'>[],
   ): Promise<void>;
+  findDependentCourses(courseId: string): Promise<Course[]>;
+  purgePrerequisites(courseId: string): Promise<void>;
 }

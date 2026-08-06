@@ -47,6 +47,14 @@ export class PrismaCourseRepository implements CourseRepository {
     return this.toEntity(record);
   }
 
+  public async programExists(programId: string): Promise<boolean> {
+    const count = await this.prisma.program.count({
+      where: { id: programId, deletedAt: null },
+    });
+
+    return count > 0;
+  }
+
   public async update(course: Course): Promise<Course> {
     const record = await this.prisma.course.update({
       where: { id: course.id },
@@ -118,6 +126,33 @@ export class PrismaCourseRepository implements CourseRepository {
           ),
         });
       }
+    });
+  }
+
+  public async findDependentCourses(courseId: string): Promise<Course[]> {
+    const rows = await this.prisma.coursePrerequisite.findMany({
+      where: { requiredCourseId: courseId },
+      select: { courseId: true },
+    });
+
+    const ids = rows.map((r: { courseId: string }) => r.courseId);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const records = await this.prisma.course.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+    });
+
+    return records.map((r: PrismaCourse) => this.toEntity(r));
+  }
+
+  public async purgePrerequisites(courseId: string): Promise<void> {
+    await this.prisma.coursePrerequisite.deleteMany({
+      where: {
+        OR: [{ courseId }, { requiredCourseId: courseId }],
+      },
     });
   }
 

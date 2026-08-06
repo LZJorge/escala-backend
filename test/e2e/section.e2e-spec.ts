@@ -285,6 +285,46 @@ describe('Sections', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
+    it('rejects section creation for a soft-deleted course', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['section.create', 'section.read'],
+        'create-deleted-course',
+      );
+
+      const { termId, courseId, teacherId } = await seedData();
+
+      await prisma.course.update({
+        where: { id: courseId },
+        data: { deletedAt: new Date() },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/sections')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'Ghost Section',
+          capacity: 30,
+          courseId,
+          termId,
+          teacherId,
+        })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_SECTION_CREATION_FAILED,
+        path: '/sections',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+
+      const sections = await prisma.courseSection.findMany({
+        where: { courseId },
+      });
+      expect(sections).toHaveLength(0);
+    });
+
     it('rejects capacity below 1', async () => {
       const token = await loginWithPermissions(
         app,

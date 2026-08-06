@@ -56,6 +56,14 @@ export class SectionService {
       return Result.fail('Cannot create sections in a closed term');
     }
 
+    const isCourseAvailable = await this.repository.isCourseAvailable(
+      params.courseId,
+    );
+
+    if (!isCourseAvailable) {
+      return Result.fail('Cannot create a section for an unavailable course');
+    }
+
     const isTeacher = await this.repository.isTeacher(params.teacherId);
 
     if (!isTeacher) {

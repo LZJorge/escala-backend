@@ -313,12 +313,16 @@ describe('Term (e2e)', () => {
         .delete('/terms/term-1')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res: { body: { deletedId?: string; message?: string } }) => {
-          expect(res.body.data).toMatchObject({
-            deletedId: 'term-1',
-            message: 'Term deleted successfully',
-          });
-        });
+        .expect(
+          (res: {
+            body: { data?: { deletedId?: string; message?: string } };
+          }) => {
+            expect(res.body.data).toMatchObject({
+              deletedId: 'term-1',
+              message: 'Term deleted successfully',
+            });
+          },
+        );
     });
 
     it('returns 422 when term has sections', async () => {

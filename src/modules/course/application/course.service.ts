@@ -46,6 +46,14 @@ export class CourseService {
       termLevel: params.termLevel,
     });
 
+    if (!(await this.repository.programExists(params.programId))) {
+      return Result.fail('Program not found');
+    }
+
+    if (await this.hasDuplicateCode(params.programId, params.code)) {
+      return Result.fail('Course code already exists in this program');
+    }
+
     const saved = await this.repository.create(course);
 
     return Result.ok({
@@ -167,6 +175,29 @@ export class CourseService {
       return Result.fail('Course not found');
     }
 
+    if (
+      params.termLevel !== undefined &&
+      params.termLevel !== existing.termLevel
+    ) {
+      const levelCheck = await this.validateLevelChange(
+        existing.id,
+        existing.programId,
+        params.termLevel,
+      );
+
+      if (levelCheck.isFailure) {
+        return Result.fail(levelCheck.error as string);
+      }
+    }
+
+    if (
+      params.code !== undefined &&
+      params.code !== existing.code &&
+      (await this.hasDuplicateCode(existing.programId, params.code, id))
+    ) {
+      return Result.fail('Course code already exists in this program');
+    }
+
     const updated = new Course(
       {
         programId: existing.programId,
@@ -207,6 +238,8 @@ export class CourseService {
 
     await this.repository.softDelete(id);
 
+    await this.repository.purgePrerequisites(id);
+
     return Result.ok(undefined);
   }
 
@@ -220,7 +253,154 @@ export class CourseService {
       return Result.fail('Course not found');
     }
 
+    const programCourses = await this.repository.findAllByProgram(
+      course.programId,
+    );
+    const levelById = new Map<string, number>(
+      programCourses.map((c: Course) => [c.id, c.termLevel]),
+    );
+
+    const newEdges: string[] = [];
+    for (const p of prerequisites) {
+      if (p.requiredCourseId === null && p.requiredCredits === null) {
+        return Result.fail(
+          'Each prerequisite must define a required course or required credits',
+        );
+      }
+
+      if (p.requiredCourseId !== null) {
+        if (p.requiredCourseId === course.id) {
+          return Result.fail('A course cannot be its own prerequisite');
+        }
+
+        const level = levelById.get(p.requiredCourseId);
+
+        if (level === undefined) {
+          return Result.fail(
+            'Prerequisite course must exist in the same program',
+          );
+        }
+
+        if (level >= course.termLevel) {
+          return Result.fail(
+            'Prerequisite courses must belong to an earlier term level',
+          );
+        }
+
+        newEdges.push(p.requiredCourseId);
+      }
+    }
+
+    const cycleCheck = await this.wouldCreateCycle(
+      course.id,
+      course.programId,
+      newEdges,
+    );
+
+    if (cycleCheck.isFailure) {
+      return cycleCheck;
+    }
+
     await this.repository.setPrerequisites(courseId, prerequisites);
+
+    return Result.ok(undefined);
+  }
+
+  private async hasDuplicateCode(
+    programId: string,
+    code: string,
+    excludeId?: string,
+  ): Promise<boolean> {
+    const courses = await this.repository.findAllByProgram(programId);
+
+    return courses.some((c: Course) => c.code === code && c.id !== excludeId);
+  }
+
+  private async validateLevelChange(
+    courseId: string,
+    programId: string,
+    newLevel: number,
+  ): Promise<Result<void>> {
+    const programCourses = await this.repository.findAllByProgram(programId);
+    const levelById = new Map<string, number>(
+      programCourses.map((c: Course) => [c.id, c.termLevel]),
+    );
+
+    const ownPrereqs = await this.repository.getPrerequisites(courseId);
+
+    for (const row of ownPrereqs) {
+      if (!row.requiredCourseId) {
+        continue;
+      }
+
+      const level = levelById.get(row.requiredCourseId);
+
+      if (level !== undefined && level >= newLevel) {
+        return Result.fail(
+          'Cannot move course: a prerequisite must be in an earlier term level',
+        );
+      }
+    }
+
+    const dependents = await this.repository.findDependentCourses(courseId);
+
+    for (const dependent of dependents) {
+      const level = levelById.get(dependent.id);
+
+      if (level !== undefined && level <= newLevel) {
+        return Result.fail(
+          'Cannot move course: it is a prerequisite of a course in the same or earlier term level',
+        );
+      }
+    }
+
+    return Result.ok(undefined);
+  }
+
+  private async wouldCreateCycle(
+    courseId: string,
+    programId: string,
+    newEdges: string[],
+  ): Promise<Result<void>> {
+    const programCourses = await this.repository.findAllByProgram(programId);
+    const programIds = programCourses.map((c: Course) => c.id);
+    const existingRows =
+      await this.repository.getPrerequisitesForCourses(programIds);
+
+    const adjacency = new Map<string, string[]>();
+    for (const id of programIds) {
+      adjacency.set(id, []);
+    }
+    for (const row of existingRows) {
+      if (!row.requiredCourseId) {
+        continue;
+      }
+      adjacency.get(row.courseId)?.push(row.requiredCourseId);
+    }
+    if (adjacency.has(courseId)) {
+      adjacency.get(courseId)?.push(...newEdges);
+    }
+
+    const visited = new Set<string>();
+    const stack: string[] = [...newEdges];
+
+    while (stack.length > 0) {
+      const node = stack.pop() as string;
+
+      if (node === courseId) {
+        return Result.fail('Prerequisites would create a cycle');
+      }
+
+      if (visited.has(node)) {
+        continue;
+      }
+
+      visited.add(node);
+
+      for (const next of adjacency.get(node) ?? []) {
+        stack.push(next);
+      }
+    }
 
     return Result.ok(undefined);
   }

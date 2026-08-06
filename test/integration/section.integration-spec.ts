@@ -66,6 +66,7 @@ describe('Section (e2e)', () => {
   let sectionRepoMock: {
     getTermStatus: jest.Mock;
     isTeacher: jest.Mock;
+    isCourseAvailable: jest.Mock;
     create: jest.Mock;
     createSchedules: jest.Mock;
     findAll: jest.Mock;
@@ -88,6 +89,7 @@ describe('Section (e2e)', () => {
     sectionRepoMock = {
       getTermStatus: jest.fn(),
       isTeacher: jest.fn(),
+      isCourseAvailable: jest.fn(),
       create: jest.fn(),
       createSchedules: jest.fn(),
       findAll: jest.fn(),
@@ -136,6 +138,7 @@ describe('Section (e2e)', () => {
 
     sectionRepoMock.getTermStatus.mockResolvedValue('ACTIVE');
     sectionRepoMock.isTeacher.mockResolvedValue(true);
+    sectionRepoMock.isCourseAvailable.mockResolvedValue(true);
 
     prismaMock.adminRole.findMany.mockResolvedValue([
       {
@@ -252,6 +255,29 @@ describe('Section (e2e)', () => {
           termId: '550e8400-e29b-41d4-a716-446655440001',
           teacherId: '550e8400-e29b-41d4-a716-446655440099',
           name: 'Hacked Section',
+          capacity: 30,
+        })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_SECTION_CREATION_FAILED,
+        path: url,
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('returns 422 when the course is soft-deleted or unavailable', async () => {
+      sectionRepoMock.isCourseAvailable.mockResolvedValueOnce(false);
+
+      const response = await request(app.getHttpServer())
+        .post(url)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          courseId: '550e8400-e29b-41d4-a716-446655440000',
+          termId: '550e8400-e29b-41d4-a716-446655440001',
+          teacherId: '550e8400-e29b-41d4-a716-446655440002',
+          name: 'Dead Course Section',
           capacity: 30,
         })
         .expect(422);
@@ -400,12 +426,16 @@ describe('Section (e2e)', () => {
         .delete('/sections/sec-1')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-        .expect((res: { body: { deletedId?: string; message?: string } }) => {
-          expect(res.body.data).toMatchObject({
-            deletedId: 'sec-1',
-            message: 'Section deleted successfully',
-          });
-        });
+        .expect(
+          (res: {
+            body: { data?: { deletedId?: string; message?: string } };
+          }) => {
+            expect(res.body.data).toMatchObject({
+              deletedId: 'sec-1',
+              message: 'Section deleted successfully',
+            });
+          },
+        );
     });
 
     it('returns 409 when section has enrollments', async () => {
@@ -554,7 +584,13 @@ describe('Section (e2e)', () => {
         .expect(200)
         .expect(
           (res: {
-            body: { sectionId?: string; deletedId?: string; message?: string };
+            body: {
+              data?: {
+                sectionId?: string;
+                deletedId?: string;
+                message?: string;
+              };
+            };
           }) => {
             expect(res.body.data).toMatchObject({
               sectionId: 'sec-1',
