@@ -11,6 +11,7 @@ export class PipelineMock {
 export class RedisServiceMock {
   public readonly get = jest.fn();
   public readonly set = jest.fn();
+  public readonly delete = jest.fn();
   public readonly del = jest.fn();
   public readonly sadd = jest.fn();
   public readonly smembers = jest.fn();

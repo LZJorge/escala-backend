@@ -20,6 +20,7 @@ import {
   UpdateProgramDto,
   ProgramResponseDto,
   PensumResponseDto,
+  ProgramSummaryResponseDto,
 } from '../application/program.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 import { DomainException } from '@core/domain/domain.exception';
@@ -94,6 +95,29 @@ export class ProgramController {
     if (result.isFailure) {
       throw new DomainException(
         ErrorCodes.ERR_PROGRAM_UPDATE_FAILED,
+        result.error as string,
+      );
+    }
+
+    return result.value;
+  }
+
+  @Get(':programId/summary')
+  @RequirePermission('program.read')
+  @ApiOperation({
+    summary:
+      'Get program summary with pensum and enrollment metadata for dashboards',
+  })
+  @ApiOkResponse({ type: ProgramSummaryResponseDto })
+  @ApiErrors(404)
+  public async getSummary(
+    @Param('programId') programId: string,
+  ): Promise<ProgramSummaryResponseDto> {
+    const result = await this.service.getSummary(programId);
+
+    if (result.isFailure) {
+      throw new DomainException(
+        ErrorCodes.ERR_PROGRAM_NOT_FOUND,
         result.error as string,
       );
     }

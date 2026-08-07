@@ -173,6 +173,236 @@ describe('Programs', () => {
     });
   });
 
+  const tag = (): string => randomBytes(4).toString('hex');
+
+  async function createStudent(ci: string): Promise<string> {
+    const salt = randomBytes(16).toString('hex');
+    const hash = scryptSync('student_password', salt, 64).toString('hex');
+    const user = await prisma.user.create({
+      data: {
+        email: `${ci}@test.edu`,
+        password: `${salt}:${hash}`,
+        firstName: 'Student',
+        lastName: ci,
+        ci: `stu-ci-${ci}`,
+      },
+    });
+    const profile = await prisma.studentProfile.create({
+      data: { userId: user.id },
+    });
+
+    return profile.id;
+  }
+
+  describe('GET /programs/:id/summary', () => {
+    it('aggregates pensum, section, and enrollment metadata', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['program.read'],
+        'summary',
+      );
+
+      const program = await prisma.program.create({
+        data: {
+          name: 'Systems Engineering',
+          termType: 'SEMESTER',
+          totalCredits: 180,
+        },
+      });
+      const otherProgram = await prisma.program.create({
+        data: { name: 'Other', termType: 'SEMESTER', totalCredits: 60 },
+      });
+
+      const c1 = await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SYS101',
+          name: 'Intro',
+          credits: 4,
+          termLevel: 1,
+        },
+      });
+      await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SYS102',
+          name: 'Math',
+          credits: 5,
+          termLevel: 1,
+        },
+      });
+      const c3 = await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SYS201',
+          name: 'Advanced',
+          credits: 5,
+          termLevel: 2,
+        },
+      });
+      await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SYS-OLD',
+          name: 'Removed',
+          credits: 3,
+          termLevel: 1,
+          deletedAt: new Date(),
+        },
+      });
+      const foreignCourse = await prisma.course.create({
+        data: {
+          programId: otherProgram.id,
+          code: 'OTH101',
+          name: 'Foreign',
+          credits: 3,
+          termLevel: 1,
+        },
+      });
+
+      const term = await prisma.term.create({
+        data: {
+          name: `Term ${tag()}`,
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('teacher_password', salt, 64).toString('hex');
+      const teacherUser = await prisma.user.create({
+        data: {
+          email: `teacher-${tag()}@test.edu`,
+          password: `${salt}:${hash}`,
+          firstName: 'Prof',
+          lastName: tag(),
+          ci: `teacher-ci-${tag()}`,
+        },
+      });
+      const teacher = await prisma.adminProfile.create({
+        data: { userId: teacherUser.id },
+      });
+
+      const student1 = await createStudent('s1');
+      const student2 = await createStudent('s2');
+
+      const sectionA = await prisma.courseSection.create({
+        data: {
+          courseId: c1.id,
+          termId: term.id,
+          teacherId: teacher.id,
+          name: 'Sec A',
+          capacity: 30,
+        },
+      });
+      const sectionB = await prisma.courseSection.create({
+        data: {
+          courseId: c3.id,
+          termId: term.id,
+          teacherId: teacher.id,
+          name: 'Sec B',
+          capacity: 30,
+        },
+      });
+      const foreignSection = await prisma.courseSection.create({
+        data: {
+          courseId: foreignCourse.id,
+          termId: term.id,
+          teacherId: teacher.id,
+          name: 'Sec F',
+          capacity: 30,
+        },
+      });
+
+      await prisma.coursePrerequisite.create({
+        data: { courseId: c3.id, requiredCourseId: c1.id },
+      });
+
+      await prisma.enrollment.createMany({
+        data: [
+          { sectionId: sectionA.id, studentId: student1, status: 'ENROLLED' },
+          { sectionId: sectionA.id, studentId: student2, status: 'ENROLLED' },
+          { sectionId: sectionB.id, studentId: student2, status: 'ENROLLED' },
+          { sectionId: sectionB.id, studentId: student1, status: 'DROPPED' },
+          {
+            sectionId: foreignSection.id,
+            studentId: student1,
+            status: 'ENROLLED',
+          },
+        ],
+      });
+
+      await prisma.transcript.createMany({
+        data: [
+          {
+            studentId: student1,
+            courseId: c1.id,
+            termId: term.id,
+            finalGrade: 4.5,
+            status: 'PASSED',
+          },
+          {
+            studentId: student2,
+            courseId: c3.id,
+            termId: term.id,
+            finalGrade: 3.8,
+            status: 'PASSED',
+          },
+        ],
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/programs/${program.id}/summary`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual({
+        programId: program.id,
+        name: 'Systems Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 180,
+        allocatedCredits: 14,
+        courseCount: 3,
+        totalTermLevels: 2,
+        prerequisiteChainsCount: 1,
+        sectionCount: 2,
+        studentCount: 2,
+        dropoutCount: 1,
+        activeTeachersCount: 1,
+        totalCapacity: 60,
+        availableSpots: 58,
+        historicalTranscriptsCount: 2,
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('returns 404 for a soft-deleted program', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['program.read'],
+        'summary-404',
+      );
+
+      const program = await prisma.program.create({
+        data: { name: 'Ghost', termType: 'SEMESTER', totalCredits: 60 },
+      });
+
+      await prisma.program.update({
+        where: { id: program.id },
+        data: { deletedAt: new Date() },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/programs/${program.id}/summary`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+  });
+
   describe('DELETE /programs/:id', () => {
     it('soft-deletes the program and preserves associated courses', async () => {
       const token = await loginWithPermissions(

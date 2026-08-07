@@ -134,6 +134,9 @@ describe('Course (e2e)', () => {
         .expect(201);
       expect(response.body.data.id).toBe(COURSE_UUID);
       expect(response.body.data.code).toBe('CS101');
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:summary`,
+      );
     });
 
     it('returns 404 when the program does not exist', async () => {

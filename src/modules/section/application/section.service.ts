@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Result } from '@core/domain/result';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
 import { SECTION_REPOSITORY } from '../domain/section.repository';
 import type {
   SectionRepository,
@@ -14,7 +16,16 @@ export class SectionService {
   constructor(
     @Inject(SECTION_REPOSITORY)
     private readonly repository: SectionRepository,
+    private readonly redisService: RedisService,
   ) {}
+
+  private async invalidateProgramSummary(courseId: string): Promise<void> {
+    const programId = await this.repository.getCourseProgramId(courseId);
+
+    if (programId) {
+      await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(programId));
+    }
+  }
 
   public async create(params: {
     courseId: string;
@@ -89,6 +100,8 @@ export class SectionService {
     });
 
     const saved = await this.repository.create(section);
+
+    await this.invalidateProgramSummary(params.courseId);
 
     let schedules: SectionSchedule[] = [];
 
@@ -279,6 +292,8 @@ export class SectionService {
 
     const saved = await this.repository.update(updated);
 
+    await this.invalidateProgramSummary(existing.section.courseId);
+
     return Result.ok({
       id: saved.id,
       courseId: saved.courseId,
@@ -325,6 +340,8 @@ export class SectionService {
     }
 
     await this.repository.softDelete(id);
+
+    await this.invalidateProgramSummary(existing.section.courseId);
 
     return Result.ok(undefined);
   }

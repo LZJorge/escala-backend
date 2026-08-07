@@ -67,6 +67,7 @@ describe('Section (e2e)', () => {
     getTermStatus: jest.Mock;
     isTeacher: jest.Mock;
     isCourseAvailable: jest.Mock;
+    getCourseProgramId: jest.Mock;
     create: jest.Mock;
     createSchedules: jest.Mock;
     findAll: jest.Mock;
@@ -90,6 +91,7 @@ describe('Section (e2e)', () => {
       getTermStatus: jest.fn(),
       isTeacher: jest.fn(),
       isCourseAvailable: jest.fn(),
+      getCourseProgramId: jest.fn(),
       create: jest.fn(),
       createSchedules: jest.fn(),
       findAll: jest.fn(),
@@ -167,6 +169,7 @@ describe('Section (e2e)', () => {
         buildSection({ name: 'Section A' }, 'sec-1'),
       );
       sectionRepoMock.createSchedules.mockResolvedValue([]);
+      sectionRepoMock.getCourseProgramId.mockResolvedValue('prog-1');
 
       const response = await request(app.getHttpServer())
         .post(url)
@@ -183,6 +186,9 @@ describe('Section (e2e)', () => {
       expect(response.body.data.id).toBe('sec-1');
       expect(response.body.data.name).toBe('Section A');
       expect(response.body.data.capacity).toBe(30);
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        'escala:program:prog-1:summary',
+      );
     });
 
     it('returns 201 when creating a section with schedules', async () => {

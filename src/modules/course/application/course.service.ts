@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Result } from '@core/domain/result';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
 import { COURSE_REPOSITORY } from '../domain/course.repository';
 import type {
   CourseRepository,
@@ -18,7 +20,12 @@ export class CourseService {
   constructor(
     @Inject(COURSE_REPOSITORY)
     private readonly repository: CourseRepository,
+    private readonly redisService: RedisService,
   ) {}
+
+  private async invalidateProgramSummary(programId: string): Promise<void> {
+    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(programId));
+  }
 
   public async create(params: {
     programId: string;
@@ -55,6 +62,8 @@ export class CourseService {
     }
 
     const saved = await this.repository.create(course);
+
+    await this.invalidateProgramSummary(params.programId);
 
     return Result.ok({
       id: saved.id,
@@ -211,6 +220,8 @@ export class CourseService {
 
     const saved = await this.repository.update(updated);
 
+    await this.invalidateProgramSummary(existing.programId);
+
     const prereqs = await this.repository.getPrerequisites(id);
 
     return Result.ok({
@@ -239,6 +250,8 @@ export class CourseService {
     await this.repository.softDelete(id);
 
     await this.repository.purgePrerequisites(id);
+
+    await this.invalidateProgramSummary(existing.programId);
 
     return Result.ok(undefined);
   }
@@ -302,6 +315,8 @@ export class CourseService {
     }
 
     await this.repository.setPrerequisites(courseId, prerequisites);
+
+    await this.invalidateProgramSummary(course.programId);
 
     return Result.ok(undefined);
   }

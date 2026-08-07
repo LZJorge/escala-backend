@@ -1,20 +1,26 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Result } from '@core/domain/result';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
 import { PROGRAM_REPOSITORY } from '../domain/program.repository';
 import type {
   ProgramRepository,
   PensumData,
   PensumCourse,
   PensumCoursePrereq,
+  ProgramSummaryData,
 } from '../domain/program.repository';
 import { Program } from '../domain/program.entity';
 import type { TermType } from '@prisma/client';
+
+const SUMMARY_TTL_SECONDS = 30 * 60;
 
 @Injectable()
 export class ProgramService {
   constructor(
     @Inject(PROGRAM_REPOSITORY)
     private readonly repository: ProgramRepository,
+    private readonly redisService: RedisService,
   ) {}
 
   public async create(params: {
@@ -128,6 +134,8 @@ export class ProgramService {
 
     const saved = await this.repository.update(updated);
 
+    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(id));
+
     return Result.ok({
       id: saved.id,
       name: saved.name,
@@ -146,7 +154,87 @@ export class ProgramService {
 
     await this.repository.softDelete(id);
 
+    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(id));
+
     return Result.ok(undefined);
+  }
+
+  public async getSummary(id: string): Promise<
+    Result<{
+      programId: string;
+      name: string;
+      termType: string;
+      totalCredits: number;
+      allocatedCredits: number;
+      courseCount: number;
+      totalTermLevels: number;
+      prerequisiteChainsCount: number;
+      sectionCount: number;
+      studentCount: number;
+      dropoutCount: number;
+      activeTeachersCount: number;
+      totalCapacity: number;
+      availableSpots: number;
+      historicalTranscriptsCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>
+  > {
+    const cacheKey = CacheKeys.PROGRAM_SUMMARY(id);
+    const cached = await this.redisService.get<{
+      programId: string;
+      name: string;
+      termType: string;
+      totalCredits: number;
+      allocatedCredits: number;
+      courseCount: number;
+      totalTermLevels: number;
+      prerequisiteChainsCount: number;
+      sectionCount: number;
+      studentCount: number;
+      dropoutCount: number;
+      activeTeachersCount: number;
+      totalCapacity: number;
+      availableSpots: number;
+      historicalTranscriptsCount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
+    const data: ProgramSummaryData | null =
+      await this.repository.getSummary(id);
+
+    if (!data) {
+      return Result.fail('Program not found');
+    }
+
+    const summary = {
+      programId: data.id,
+      name: data.name,
+      termType: data.termType,
+      totalCredits: data.totalCredits,
+      allocatedCredits: data.allocatedCredits,
+      courseCount: data.courseCount,
+      totalTermLevels: data.totalTermLevels,
+      prerequisiteChainsCount: data.prerequisiteChainsCount,
+      sectionCount: data.sectionCount,
+      studentCount: data.studentCount,
+      dropoutCount: data.dropoutCount,
+      activeTeachersCount: data.activeTeachersCount,
+      totalCapacity: data.totalCapacity,
+      availableSpots: data.availableSpots,
+      historicalTranscriptsCount: data.historicalTranscriptsCount,
+      createdAt: data.createdAt.toISOString(),
+      updatedAt: data.updatedAt.toISOString(),
+    };
+
+    await this.redisService.set(cacheKey, summary, SUMMARY_TTL_SECONDS);
+
+    return Result.ok(summary);
   }
 
   public async getPensum(id: string): Promise<

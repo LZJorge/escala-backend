@@ -22,6 +22,7 @@ describe('Program (e2e)', () => {
     update: jest.Mock;
     softDelete: jest.Mock;
     getPensum: jest.Mock;
+    getSummary: jest.Mock;
   };
   let jwtService: JwtService;
   let adminToken: string;
@@ -35,6 +36,7 @@ describe('Program (e2e)', () => {
       update: jest.fn(),
       softDelete: jest.fn(),
       getPensum: jest.fn(),
+      getSummary: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -73,6 +75,8 @@ describe('Program (e2e)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    redisMock.get.mockResolvedValue(null);
 
     prismaMock.adminRole.findMany.mockResolvedValue([
       {
@@ -190,6 +194,9 @@ describe('Program (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.name).toBe('Updated');
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        'escala:program:prog-1:summary',
+      );
     });
 
     it('returns 422 when not found', async () => {
@@ -244,6 +251,164 @@ describe('Program (e2e)', () => {
         path: '/programs/nope',
       });
       expect(response.body).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('GET /programs/:programId/summary', () => {
+    it('returns 200 with program metadata', async () => {
+      programRepoMock.getSummary.mockResolvedValue({
+        id: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        allocatedCredits: 150,
+        courseCount: 42,
+        totalTermLevels: 8,
+        prerequisiteChainsCount: 10,
+        sectionCount: 15,
+        studentCount: 320,
+        dropoutCount: 14,
+        activeTeachersCount: 8,
+        totalCapacity: 400,
+        availableSpots: 80,
+        historicalTranscriptsCount: 1200,
+        createdAt: new Date('2025-01-15T10:00:00Z'),
+        updatedAt: new Date('2026-03-20T14:30:00Z'),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/programs/prog-1/summary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual({
+        programId: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        allocatedCredits: 150,
+        courseCount: 42,
+        totalTermLevels: 8,
+        prerequisiteChainsCount: 10,
+        sectionCount: 15,
+        studentCount: 320,
+        dropoutCount: 14,
+        activeTeachersCount: 8,
+        totalCapacity: 400,
+        availableSpots: 80,
+        historicalTranscriptsCount: 1200,
+        createdAt: '2025-01-15T10:00:00.000Z',
+        updatedAt: '2026-03-20T14:30:00.000Z',
+      });
+    });
+
+    it('returns the cached summary without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue({
+        programId: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        allocatedCredits: 150,
+        courseCount: 42,
+        totalTermLevels: 8,
+        prerequisiteChainsCount: 10,
+        sectionCount: 15,
+        studentCount: 320,
+        dropoutCount: 14,
+        activeTeachersCount: 8,
+        totalCapacity: 400,
+        availableSpots: 80,
+        historicalTranscriptsCount: 1200,
+        createdAt: '2025-01-15T10:00:00.000Z',
+        updatedAt: '2026-03-20T14:30:00.000Z',
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/programs/prog-1/summary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual({
+        programId: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        allocatedCredits: 150,
+        courseCount: 42,
+        totalTermLevels: 8,
+        prerequisiteChainsCount: 10,
+        sectionCount: 15,
+        studentCount: 320,
+        dropoutCount: 14,
+        activeTeachersCount: 8,
+        totalCapacity: 400,
+        availableSpots: 80,
+        historicalTranscriptsCount: 1200,
+        createdAt: '2025-01-15T10:00:00.000Z',
+        updatedAt: '2026-03-20T14:30:00.000Z',
+      });
+      expect(programRepoMock.getSummary).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
+    });
+
+    it('caches the computed summary with a 30 minute TTL', async () => {
+      programRepoMock.getSummary.mockResolvedValue({
+        id: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        allocatedCredits: 150,
+        courseCount: 42,
+        totalTermLevels: 8,
+        prerequisiteChainsCount: 10,
+        sectionCount: 15,
+        studentCount: 320,
+        dropoutCount: 14,
+        activeTeachersCount: 8,
+        totalCapacity: 400,
+        availableSpots: 80,
+        historicalTranscriptsCount: 1200,
+        createdAt: new Date('2025-01-15T10:00:00Z'),
+        updatedAt: new Date('2026-03-20T14:30:00Z'),
+      });
+
+      await request(app.getHttpServer())
+        .get('/programs/prog-1/summary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(redisMock.set).toHaveBeenCalledWith(
+        'escala:program:prog-1:summary',
+        expect.objectContaining({ programId: 'prog-1' }),
+        1800,
+      );
+    });
+
+    it('returns 404 when program not found', async () => {
+      programRepoMock.getSummary.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .get('/programs/nope/summary')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: '/programs/nope/summary',
+      });
+    });
+
+    it('returns 401 without token', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/programs/prog-1/summary')
+        .expect(401);
+
+      expect(response.body).toMatchObject({
+        statusCode: 401,
+        errorCode: ErrorCodes.SEC_AUTH_TOKEN_MISSING,
+        path: '/programs/prog-1/summary',
+      });
     });
   });
 
