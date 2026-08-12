@@ -23,11 +23,7 @@ export class ProgramService {
     private readonly redisService: RedisService,
   ) {}
 
-  public async create(params: {
-    name: string;
-    termType: TermType;
-    totalCredits: number;
-  }): Promise<
+  public async create(params: { name: string; termType: TermType }): Promise<
     Result<{
       id: string;
       name: string;
@@ -39,7 +35,7 @@ export class ProgramService {
     const program = new Program({
       name: params.name,
       termType: params.termType,
-      totalCredits: params.totalCredits,
+      totalCredits: 0,
     });
 
     const saved = await this.repository.create(program);
@@ -106,7 +102,6 @@ export class ProgramService {
     params: {
       name?: string;
       termType?: TermType;
-      totalCredits?: number;
     },
   ): Promise<
     Result<{
@@ -127,7 +122,7 @@ export class ProgramService {
       {
         name: params.name ?? existing.name,
         termType: params.termType ?? existing.termType,
-        totalCredits: params.totalCredits ?? existing.totalCredits,
+        totalCredits: existing.totalCredits,
       },
       existing.id,
     );

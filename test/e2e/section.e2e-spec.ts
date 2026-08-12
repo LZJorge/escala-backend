@@ -128,7 +128,6 @@ describe('Sections', () => {
       data: {
         name: `Engineering ${suffix}`,
         termType: 'SEMESTER',
-        totalCredits: 200,
       },
     });
 
@@ -740,7 +739,7 @@ describe('Sections', () => {
       });
 
       const otherProgram = await prisma.program.create({
-        data: { name: 'Physics', termType: 'SEMESTER', totalCredits: 120 },
+        data: { name: 'Physics', termType: 'SEMESTER' },
       });
 
       const otherCourse = await prisma.course.create({

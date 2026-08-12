@@ -1,12 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsString,
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  Min,
-} from 'class-validator';
+import { IsString, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
 import { TermType } from '@prisma/client';
 
 export class CreateProgramDto {
@@ -18,11 +11,6 @@ export class CreateProgramDto {
   @ApiProperty({ enum: ['SEMESTER', 'QUARTER', 'YEAR'], example: 'SEMESTER' })
   @IsEnum(TermType)
   public readonly termType: TermType;
-
-  @ApiProperty({ example: 120 })
-  @IsInt()
-  @Min(1)
-  public readonly totalCredits: number;
 }
 
 export class UpdateProgramDto {
@@ -36,12 +24,6 @@ export class UpdateProgramDto {
   @IsOptional()
   @IsEnum(TermType)
   public readonly termType?: TermType;
-
-  @ApiPropertyOptional({ example: 130 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  public readonly totalCredits?: number;
 }
 
 export class ProgramResponseDto {
@@ -76,7 +58,7 @@ export class ProgramSummaryResponseDto {
 
   @ApiProperty({
     description:
-      'Sum of credits of active pensum courses (compare against totalCredits)',
+      'Sum of credits of active pensum courses (same as totalCredits)',
   })
   public allocatedCredits: number;
 

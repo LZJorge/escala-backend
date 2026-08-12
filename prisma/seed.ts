@@ -308,7 +308,6 @@ async function createDemoProgram(prisma: PrismaClient): Promise<void> {
     data: {
       name: DEMO_PROGRAM_NAME,
       termType: 'SEMESTER',
-      totalCredits,
     },
   });
   console.log(`Program created: ${program.name} (${totalCredits} credits)`);

@@ -21,11 +21,10 @@ export class PrismaProgramRepository implements ProgramRepository {
         id: program.id,
         name: program.name,
         termType: program.termType,
-        totalCredits: program.totalCredits,
       },
     });
 
-    return this.toEntity(record);
+    return this.toEntity(record, 0);
   }
 
   public async findAll(): Promise<Program[]> {
@@ -34,7 +33,11 @@ export class PrismaProgramRepository implements ProgramRepository {
       orderBy: { createdAt: 'desc' },
     });
 
-    return records.map((r: PrismaProgram) => this.toEntity(r));
+    const creditSums = await this.getCreditSums();
+
+    return records.map((r: PrismaProgram) =>
+      this.toEntity(r, creditSums.get(r.id) ?? 0),
+    );
   }
 
   public async findById(id: string): Promise<Program | null> {
@@ -46,7 +49,9 @@ export class PrismaProgramRepository implements ProgramRepository {
       return null;
     }
 
-    return this.toEntity(record);
+    const creditSums = await this.getCreditSums();
+
+    return this.toEntity(record, creditSums.get(id) ?? 0);
   }
 
   public async update(program: Program): Promise<Program> {
@@ -55,11 +60,27 @@ export class PrismaProgramRepository implements ProgramRepository {
       data: {
         name: program.name,
         termType: program.termType,
-        totalCredits: program.totalCredits,
       },
     });
 
-    return this.toEntity(record);
+    const creditSums = await this.getCreditSums();
+
+    return this.toEntity(record, creditSums.get(program.id) ?? 0);
+  }
+
+  private async getCreditSums(): Promise<Map<string, number>> {
+    const rows = await this.prisma.course.groupBy({
+      by: ['programId'],
+      where: { deletedAt: null },
+      _sum: { credits: true },
+    });
+
+    return new Map(
+      rows.map((r: { programId: string; _sum: { credits: number | null } }) => [
+        r.programId,
+        r._sum.credits ?? 0,
+      ]),
+    );
   }
 
   public async softDelete(id: string): Promise<void> {
@@ -137,7 +158,10 @@ export class PrismaProgramRepository implements ProgramRepository {
       id: record.id,
       name: record.name,
       termType: record.termType,
-      totalCredits: record.totalCredits,
+      totalCredits: record.courses.reduce(
+        (sum: number, c: { credits: number }) => sum + c.credits,
+        0,
+      ),
       updatedAt,
       courses,
     };
@@ -150,7 +174,6 @@ export class PrismaProgramRepository implements ProgramRepository {
         id: true,
         name: true,
         termType: true,
-        totalCredits: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -242,7 +265,7 @@ export class PrismaProgramRepository implements ProgramRepository {
       id: record.id,
       name: record.name,
       termType: record.termType,
-      totalCredits: record.totalCredits,
+      totalCredits: creditsAgg._sum.credits ?? 0,
       allocatedCredits: creditsAgg._sum.credits ?? 0,
       courseCount: courseAgg._count._all,
       totalTermLevels: courseAgg._max.termLevel ?? 0,
@@ -259,12 +282,12 @@ export class PrismaProgramRepository implements ProgramRepository {
     };
   }
 
-  private toEntity(record: PrismaProgram): Program {
+  private toEntity(record: PrismaProgram, totalCredits: number): Program {
     return new Program(
       {
         name: record.name,
         termType: record.termType,
-        totalCredits: record.totalCredits,
+        totalCredits,
       },
       record.id,
     );

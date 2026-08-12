@@ -105,7 +105,6 @@ describe('Programs', () => {
         data: {
           name: 'Computer Science',
           termType: 'SEMESTER',
-          totalCredits: 120,
         },
       });
 
@@ -144,7 +143,7 @@ describe('Programs', () => {
       expect(response.body.data).toMatchObject({
         name: 'Computer Science',
         termType: 'SEMESTER',
-        totalCredits: 120,
+        totalCredits: 8,
       });
 
       type CourseView = {
@@ -207,11 +206,10 @@ describe('Programs', () => {
         data: {
           name: 'Systems Engineering',
           termType: 'SEMESTER',
-          totalCredits: 180,
         },
       });
       const otherProgram = await prisma.program.create({
-        data: { name: 'Other', termType: 'SEMESTER', totalCredits: 60 },
+        data: { name: 'Other', termType: 'SEMESTER' },
       });
 
       const c1 = await prisma.course.create({
@@ -362,7 +360,7 @@ describe('Programs', () => {
         programId: program.id,
         name: 'Systems Engineering',
         termType: 'SEMESTER',
-        totalCredits: 180,
+        totalCredits: 14,
         allocatedCredits: 14,
         courseCount: 3,
         totalTermLevels: 2,
@@ -388,7 +386,7 @@ describe('Programs', () => {
       );
 
       const program = await prisma.program.create({
-        data: { name: 'Ghost', termType: 'SEMESTER', totalCredits: 60 },
+        data: { name: 'Ghost', termType: 'SEMESTER' },
       });
 
       await prisma.program.update({
@@ -413,7 +411,7 @@ describe('Programs', () => {
       );
 
       const program = await prisma.program.create({
-        data: { name: 'To Delete', termType: 'SEMESTER', totalCredits: 60 },
+        data: { name: 'To Delete', termType: 'SEMESTER' },
       });
 
       await prisma.course.create({

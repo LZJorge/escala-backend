@@ -100,7 +100,6 @@ describe('Courses', () => {
       data: {
         name: `Pensum ${tag()}`,
         termType: 'SEMESTER',
-        totalCredits: 100,
       },
     });
 
@@ -131,7 +130,7 @@ describe('Courses', () => {
       );
 
       const program = await prisma.program.create({
-        data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
+        data: { name: 'Engineering', termType: 'SEMESTER' },
       });
 
       const math = await prisma.course.create({
@@ -192,7 +191,7 @@ describe('Courses', () => {
       );
 
       const program = await prisma.program.create({
-        data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
+        data: { name: 'Engineering', termType: 'SEMESTER' },
       });
 
       const course = await prisma.course.create({
@@ -299,7 +298,6 @@ describe('Courses', () => {
         data: {
           name: `Foreign ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 80,
         },
       });
       const foreignCourse = await prisma.course.create({
@@ -630,7 +628,6 @@ describe('Courses', () => {
         data: {
           name: `Sec Prog ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 100,
         },
       });
       const course = await prisma.course.create({
@@ -717,7 +714,6 @@ describe('Courses', () => {
         data: {
           name: `Pensum ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 120,
         },
       });
 
@@ -772,7 +768,6 @@ describe('Courses', () => {
         data: {
           name: `Doomed ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 90,
         },
       });
 
@@ -806,7 +801,6 @@ describe('Courses', () => {
         data: {
           name: `Dup ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 100,
         },
       });
 
@@ -852,14 +846,12 @@ describe('Courses', () => {
         data: {
           name: `Pensum A ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 100,
         },
       });
       const programB = await prisma.program.create({
         data: {
           name: `Pensum B ${tag()}`,
           termType: 'SEMESTER',
-          totalCredits: 100,
         },
       });
 
@@ -897,11 +889,11 @@ describe('Courses', () => {
       );
 
       const engineering = await prisma.program.create({
-        data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
+        data: { name: 'Engineering', termType: 'SEMESTER' },
       });
 
       const medicine = await prisma.program.create({
-        data: { name: 'Medicine', termType: 'SEMESTER', totalCredits: 300 },
+        data: { name: 'Medicine', termType: 'SEMESTER' },
       });
 
       await prisma.course.create({

@@ -458,7 +458,7 @@ describe('Terms', () => {
       });
 
       const program = await prisma.program.create({
-        data: { name: 'Engineering', termType: 'SEMESTER', totalCredits: 200 },
+        data: { name: 'Engineering', termType: 'SEMESTER' },
       });
 
       const course = await prisma.course.create({

@@ -110,7 +110,7 @@ describe('Program (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post(url)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ name: 'Engineering', termType: 'SEMESTER', totalCredits: 160 })
+        .send({ name: 'Engineering', termType: 'SEMESTER' })
         .expect(201);
 
       expect(response.body.data.id).toBe('prog-1');
@@ -120,7 +120,7 @@ describe('Program (e2e)', () => {
     it('returns 401 without token', async () => {
       const response = await request(app.getHttpServer())
         .post(url)
-        .send({ name: 'Engineering', termType: 'SEMESTER', totalCredits: 160 })
+        .send({ name: 'Engineering', termType: 'SEMESTER' })
         .expect(401);
 
       expect(response.body).toMatchObject({
