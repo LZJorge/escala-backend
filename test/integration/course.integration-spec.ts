@@ -84,6 +84,8 @@ describe('Course (e2e)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    redisMock.get.mockResolvedValue(null);
+
     prismaMock.adminRole.findMany.mockResolvedValue([
       {
         role: {
@@ -135,7 +137,14 @@ describe('Course (e2e)', () => {
       expect(response.body.data.id).toBe(COURSE_UUID);
       expect(response.body.data.code).toBe('CS101');
       expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:courses`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith('escala:program:all');
+      expect(redisMock.delete).toHaveBeenCalledWith(
         `escala:program:${PROG_UUID}:summary`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:pensum`,
       );
     });
 
@@ -255,6 +264,35 @@ describe('Course (e2e)', () => {
           requiredCredits: null,
         },
       ]);
+      expect(redisMock.set).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:courses`,
+        expect.any(Array),
+        1800,
+      );
+    });
+
+    it('returns the cached course list without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue([
+        {
+          id: COURSE_UUID,
+          programId: PROG_UUID,
+          code: 'CS101',
+          name: 'Intro',
+          credits: 4,
+          termLevel: 1,
+          createdAt: '2025-01-15T10:00:00.000Z',
+          prerequisites: [],
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get(`/courses/by-program/${PROG_UUID}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(courseRepoMock.findAllByProgram).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
   });
 
@@ -271,6 +309,33 @@ describe('Course (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.code).toBe('CS101');
+      expect(redisMock.set).toHaveBeenCalledWith(
+        `escala:course:${COURSE_UUID}`,
+        expect.objectContaining({ code: 'CS101' }),
+        1800,
+      );
+    });
+
+    it('returns the cached course without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue({
+        id: COURSE_UUID,
+        programId: PROG_UUID,
+        code: 'CS101',
+        name: 'Intro',
+        credits: 4,
+        termLevel: 1,
+        createdAt: '2025-01-15T10:00:00.000Z',
+        prerequisites: [],
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/courses/${COURSE_UUID}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data.code).toBe('CS101');
+      expect(courseRepoMock.findById).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
 
     it('returns 404 when not found', async () => {
@@ -299,6 +364,15 @@ describe('Course (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.name).toBe('Updated');
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:course:${COURSE_UUID}`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:courses`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:pensum`,
+      );
     });
 
     it('returns 404 when not found', async () => {
@@ -447,6 +521,12 @@ describe('Course (e2e)', () => {
       expect(courseRepoMock.purgePrerequisites).toHaveBeenCalledWith(
         COURSE_UUID,
       );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:course:${COURSE_UUID}`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:courses`,
+      );
     });
 
     it('returns 404 when not found', async () => {
@@ -489,6 +569,13 @@ describe('Course (e2e)', () => {
             });
           },
         );
+
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:course:${COURSE_UUID}`,
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        `escala:program:${PROG_UUID}:courses`,
+      );
     });
 
     it('returns 401 without token', async () => {

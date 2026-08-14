@@ -8,6 +8,9 @@ import type {
   CoursePrerequisiteRow,
 } from '../domain/course.repository';
 import { Course } from '../domain/course.entity';
+import type { CourseResponseDto } from './course.dto';
+
+const CACHE_TTL_SECONDS = 30 * 60;
 
 interface PrerequisiteResponse {
   courseId: string;
@@ -23,8 +26,20 @@ export class CourseService {
     private readonly redisService: RedisService,
   ) {}
 
-  private async invalidateProgramSummary(programId: string): Promise<void> {
+  private async invalidateCourseCache(
+    programId: string,
+    courseId?: string,
+  ): Promise<void> {
+    await this.redisService.delete(CacheKeys.COURSE_BY_PROGRAM(programId));
+
+    if (courseId !== undefined) {
+      await this.redisService.delete(CacheKeys.COURSE_BY_ID(courseId));
+    }
+
+    await this.redisService.delete(CacheKeys.PROGRAM_ALL());
+    await this.redisService.delete(CacheKeys.PROGRAM_BY_ID(programId));
     await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(programId));
+    await this.redisService.delete(CacheKeys.PROGRAM_PENSUM(programId));
   }
 
   public async create(params: {
@@ -63,7 +78,7 @@ export class CourseService {
 
     const saved = await this.repository.create(course);
 
-    await this.invalidateProgramSummary(params.programId);
+    await this.invalidateCourseCache(params.programId);
 
     return Result.ok({
       id: saved.id,
@@ -91,6 +106,13 @@ export class CourseService {
       }>
     >
   > {
+    const cacheKey = CacheKeys.COURSE_BY_PROGRAM(programId);
+    const cached = await this.redisService.get<CourseResponseDto[]>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const courses = await this.repository.findAllByProgram(programId);
 
     const allPrereqs = await this.repository.getPrerequisitesForCourses(
@@ -108,18 +130,20 @@ export class CourseService {
       prereqsByCourse.set(p.courseId, list);
     }
 
-    return Result.ok(
-      courses.map((c: Course) => ({
-        id: c.id,
-        programId: c.programId,
-        code: c.code,
-        name: c.name,
-        credits: c.credits,
-        termLevel: c.termLevel,
-        createdAt: c.createdAt.toISOString(),
-        prerequisites: prereqsByCourse.get(c.id) ?? [],
-      })),
-    );
+    const result = courses.map((c: Course) => ({
+      id: c.id,
+      programId: c.programId,
+      code: c.code,
+      name: c.name,
+      credits: c.credits,
+      termLevel: c.termLevel,
+      createdAt: c.createdAt.toISOString(),
+      prerequisites: prereqsByCourse.get(c.id) ?? [],
+    }));
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async findById(id: string): Promise<
@@ -134,6 +158,13 @@ export class CourseService {
       prerequisites: PrerequisiteResponse[];
     }>
   > {
+    const cacheKey = CacheKeys.COURSE_BY_ID(id);
+    const cached = await this.redisService.get<CourseResponseDto>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const course = await this.repository.findById(id);
 
     if (!course) {
@@ -142,7 +173,7 @@ export class CourseService {
 
     const prereqs = await this.repository.getPrerequisites(id);
 
-    return Result.ok({
+    const result = {
       id: course.id,
       programId: course.programId,
       code: course.code,
@@ -155,7 +186,11 @@ export class CourseService {
         requiredCourseId: p.requiredCourseId,
         requiredCredits: p.requiredCredits,
       })),
-    });
+    };
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async update(
@@ -220,7 +255,7 @@ export class CourseService {
 
     const saved = await this.repository.update(updated);
 
-    await this.invalidateProgramSummary(existing.programId);
+    await this.invalidateCourseCache(existing.programId, existing.id);
 
     const prereqs = await this.repository.getPrerequisites(id);
 
@@ -251,7 +286,7 @@ export class CourseService {
 
     await this.repository.purgePrerequisites(id);
 
-    await this.invalidateProgramSummary(existing.programId);
+    await this.invalidateCourseCache(existing.programId, existing.id);
 
     return Result.ok(undefined);
   }
@@ -316,7 +351,7 @@ export class CourseService {
 
     await this.repository.setPrerequisites(courseId, prerequisites);
 
-    await this.invalidateProgramSummary(course.programId);
+    await this.invalidateCourseCache(course.programId, course.id);
 
     return Result.ok(undefined);
   }

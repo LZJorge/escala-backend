@@ -12,8 +12,9 @@ import type {
 } from '../domain/program.repository';
 import { Program } from '../domain/program.entity';
 import type { TermType } from '@prisma/client';
+import type { PensumResponseDto, ProgramResponseDto } from './program.dto';
 
-const SUMMARY_TTL_SECONDS = 30 * 60;
+const CACHE_TTL_SECONDS = 30 * 60;
 
 @Injectable()
 export class ProgramService {
@@ -40,6 +41,8 @@ export class ProgramService {
 
     const saved = await this.repository.create(program);
 
+    await this.redisService.delete(CacheKeys.PROGRAM_ALL());
+
     return Result.ok({
       id: saved.id,
       name: saved.name,
@@ -60,17 +63,26 @@ export class ProgramService {
       }>
     >
   > {
+    const cacheKey = CacheKeys.PROGRAM_ALL();
+    const cached = await this.redisService.get<ProgramResponseDto[]>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const programs = await this.repository.findAll();
 
-    return Result.ok(
-      programs.map((p: Program) => ({
-        id: p.id,
-        name: p.name,
-        termType: p.termType,
-        totalCredits: p.totalCredits,
-        createdAt: p.createdAt.toISOString(),
-      })),
-    );
+    const result = programs.map((p: Program) => ({
+      id: p.id,
+      name: p.name,
+      termType: p.termType,
+      totalCredits: p.totalCredits,
+      createdAt: p.createdAt.toISOString(),
+    }));
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async findById(id: string): Promise<
@@ -82,19 +94,30 @@ export class ProgramService {
       createdAt: string;
     }>
   > {
+    const cacheKey = CacheKeys.PROGRAM_BY_ID(id);
+    const cached = await this.redisService.get<ProgramResponseDto>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const program = await this.repository.findById(id);
 
     if (!program) {
       return Result.fail('Program not found');
     }
 
-    return Result.ok({
+    const result = {
       id: program.id,
       name: program.name,
       termType: program.termType,
       totalCredits: program.totalCredits,
       createdAt: program.createdAt.toISOString(),
-    });
+    };
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async update(
@@ -129,7 +152,7 @@ export class ProgramService {
 
     const saved = await this.repository.update(updated);
 
-    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(id));
+    await this.invalidateProgramCache(id);
 
     return Result.ok({
       id: saved.id,
@@ -149,7 +172,7 @@ export class ProgramService {
 
     await this.repository.softDelete(id);
 
-    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(id));
+    await this.invalidateProgramCache(id);
 
     return Result.ok(undefined);
   }
@@ -227,7 +250,7 @@ export class ProgramService {
       updatedAt: data.updatedAt.toISOString(),
     };
 
-    await this.redisService.set(cacheKey, summary, SUMMARY_TTL_SECONDS);
+    await this.redisService.set(cacheKey, summary, CACHE_TTL_SECONDS);
 
     return Result.ok(summary);
   }
@@ -252,13 +275,20 @@ export class ProgramService {
       }>;
     }>
   > {
+    const cacheKey = CacheKeys.PROGRAM_PENSUM(id);
+    const cached = await this.redisService.get<PensumResponseDto>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const data: PensumData | null = await this.repository.getPensum(id);
 
     if (!data) {
       return Result.fail('Program not found');
     }
 
-    return Result.ok({
+    const result = {
       id: data.id,
       name: data.name,
       termType: data.termType,
@@ -275,6 +305,17 @@ export class ProgramService {
           requiredCredits: p.requiredCredits,
         })),
       })),
-    });
+    };
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
+  }
+
+  private async invalidateProgramCache(programId: string): Promise<void> {
+    await this.redisService.delete(CacheKeys.PROGRAM_ALL());
+    await this.redisService.delete(CacheKeys.PROGRAM_BY_ID(programId));
+    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(programId));
+    await this.redisService.delete(CacheKeys.PROGRAM_PENSUM(programId));
   }
 }

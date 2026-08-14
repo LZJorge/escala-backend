@@ -1,9 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Result } from '@core/domain/result';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
+import type { ValidCacheKey } from '@core/infrastructure/cache/cache-keys.factory';
 import { TERM_REPOSITORY } from '../domain/term.repository';
 import type { TermRepository } from '../domain/term.repository';
 import { Term } from '../domain/term.entity';
 import type { TermStatus } from '@prisma/client';
+import type { TermResponseDto } from './term.dto';
+
+const CACHE_TTL_SECONDS = 30 * 60;
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   UPCOMING: ['ACTIVE'],
@@ -16,6 +22,7 @@ export class TermService {
   constructor(
     @Inject(TERM_REPOSITORY)
     private readonly repository: TermRepository,
+    private readonly redisService: RedisService,
   ) {}
 
   private toResponse(term: Term): {
@@ -38,6 +45,27 @@ export class TermService {
       createdAt: term.createdAt.toISOString(),
       updatedAt: term.updatedAt.toISOString(),
     };
+  }
+
+  private async invalidateTermCache(
+    termId: string,
+    programId: string,
+    statuses: TermStatus[],
+  ): Promise<void> {
+    const keys: ValidCacheKey[] = [
+      CacheKeys.TERM_BY_ID(termId),
+      CacheKeys.TERM_ACTIVE(programId),
+      CacheKeys.TERM_ACTIVE(),
+    ];
+
+    for (const status of new Set([...statuses, undefined])) {
+      keys.push(CacheKeys.TERM_LIST(status, programId));
+      keys.push(CacheKeys.TERM_LIST(status, undefined));
+    }
+
+    for (const key of keys) {
+      await this.redisService.delete(key);
+    }
   }
 
   public async create(params: {
@@ -74,6 +102,8 @@ export class TermService {
 
     const saved = await this.repository.create(term);
 
+    await this.invalidateTermCache(saved.id, saved.programId, [saved.status]);
+
     return Result.ok(this.toResponse(saved));
   }
 
@@ -94,9 +124,20 @@ export class TermService {
       }>
     >
   > {
+    const cacheKey = CacheKeys.TERM_LIST(status, programId);
+    const cached = await this.redisService.get<TermResponseDto[]>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const terms = await this.repository.findAll(status, programId);
 
-    return Result.ok(terms.map((t: Term) => this.toResponse(t)));
+    const result = terms.map((t: Term) => this.toResponse(t));
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async findActive(programId?: string): Promise<
@@ -111,13 +152,24 @@ export class TermService {
       updatedAt: string;
     } | null>
   > {
+    const cacheKey = CacheKeys.TERM_ACTIVE(programId);
+    const cached = await this.redisService.get<TermResponseDto>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const term = await this.repository.findActive(programId);
 
     if (!term) {
       return Result.ok(null);
     }
 
-    return Result.ok(this.toResponse(term));
+    const result = this.toResponse(term);
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async findById(id: string): Promise<
@@ -132,13 +184,24 @@ export class TermService {
       updatedAt: string;
     }>
   > {
+    const cacheKey = CacheKeys.TERM_BY_ID(id);
+    const cached = await this.redisService.get<TermResponseDto>(cacheKey);
+
+    if (cached) {
+      return Result.ok(cached);
+    }
+
     const term = await this.repository.findById(id);
 
     if (!term) {
       return Result.fail('Term not found');
     }
 
-    return Result.ok(this.toResponse(term));
+    const result = this.toResponse(term);
+
+    await this.redisService.set(cacheKey, result, CACHE_TTL_SECONDS);
+
+    return Result.ok(result);
   }
 
   public async update(
@@ -191,6 +254,8 @@ export class TermService {
     );
 
     const saved = await this.repository.update(updated);
+
+    await this.invalidateTermCache(saved.id, saved.programId, [saved.status]);
 
     return Result.ok(this.toResponse(saved));
   }
@@ -245,6 +310,11 @@ export class TermService {
 
     const saved = await this.repository.update(updated);
 
+    await this.invalidateTermCache(saved.id, saved.programId, [
+      existing.status,
+      newStatus,
+    ]);
+
     return Result.ok(this.toResponse(saved));
   }
 
@@ -268,6 +338,8 @@ export class TermService {
     }
 
     await this.repository.softDelete(id);
+
+    await this.invalidateTermCache(id, existing.programId, [existing.status]);
 
     return Result.ok(undefined);
   }

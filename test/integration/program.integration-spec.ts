@@ -115,6 +115,7 @@ describe('Program (e2e)', () => {
 
       expect(response.body.data.id).toBe('prog-1');
       expect(response.body.data.name).toBe('Engineering');
+      expect(redisMock.delete).toHaveBeenCalledWith('escala:program:all');
     });
 
     it('returns 401 without token', async () => {
@@ -145,6 +146,32 @@ describe('Program (e2e)', () => {
 
       expect(response.body.data).toHaveLength(1);
       expect(response.body.data[0].name).toBe('Engineering');
+      expect(redisMock.set).toHaveBeenCalledWith(
+        'escala:program:all',
+        expect.any(Array),
+        1800,
+      );
+    });
+
+    it('returns the cached list without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue([
+        {
+          id: 'prog-1',
+          name: 'Engineering',
+          termType: 'SEMESTER',
+          totalCredits: 160,
+          createdAt: '2025-01-15T10:00:00.000Z',
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/programs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(programRepoMock.findAll).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
   });
 
@@ -160,6 +187,30 @@ describe('Program (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.name).toBe('Engineering');
+      expect(redisMock.set).toHaveBeenCalledWith(
+        'escala:program:prog-1',
+        expect.objectContaining({ name: 'Engineering' }),
+        1800,
+      );
+    });
+
+    it('returns the cached program without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue({
+        id: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        createdAt: '2025-01-15T10:00:00.000Z',
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/programs/prog-1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data.name).toBe('Engineering');
+      expect(programRepoMock.findById).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
 
     it('returns 404 when not found', async () => {
@@ -194,8 +245,13 @@ describe('Program (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.name).toBe('Updated');
+      expect(redisMock.delete).toHaveBeenCalledWith('escala:program:all');
+      expect(redisMock.delete).toHaveBeenCalledWith('escala:program:prog-1');
       expect(redisMock.delete).toHaveBeenCalledWith(
         'escala:program:prog-1:summary',
+      );
+      expect(redisMock.delete).toHaveBeenCalledWith(
+        'escala:program:prog-1:pensum',
       );
     });
 
@@ -448,6 +504,31 @@ describe('Program (e2e)', () => {
       expect(response.body.data.id).toBe('prog-1');
       expect(response.body.data.courses).toHaveLength(2);
       expect(response.body.data.updatedAt).toBe('2026-07-24T12:00:00.000Z');
+      expect(redisMock.set).toHaveBeenCalledWith(
+        'escala:program:prog-1:pensum',
+        expect.objectContaining({ id: 'prog-1' }),
+        1800,
+      );
+    });
+
+    it('returns the cached pensum without hitting the repository', async () => {
+      redisMock.get.mockResolvedValue({
+        id: 'prog-1',
+        name: 'Engineering',
+        termType: 'SEMESTER',
+        totalCredits: 160,
+        updatedAt: '2026-07-24T12:00:00.000Z',
+        courses: [],
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/programs/prog-1/pensum')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data.id).toBe('prog-1');
+      expect(programRepoMock.getPensum).not.toHaveBeenCalled();
+      expect(redisMock.set).not.toHaveBeenCalled();
     });
 
     it('returns 404 when program not found', async () => {
