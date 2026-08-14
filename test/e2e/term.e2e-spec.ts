@@ -61,6 +61,17 @@ async function loginWithPermissions(
   return loginRes.body.data.accessToken as string;
 }
 
+const tag = (): string => randomBytes(4).toString('hex');
+
+async function createProgram(
+  prisma: PrismaService,
+  suffix: string,
+): Promise<{ id: string }> {
+  return prisma.program.create({
+    data: { name: `Term Prog ${suffix}`, termType: 'SEMESTER' },
+  });
+}
+
 describe('Terms', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -100,6 +111,34 @@ describe('Terms', () => {
         'create-ok',
       );
 
+      const program = await createProgram(prisma, tag());
+
+      const response = await request(app.getHttpServer())
+        .post('/terms')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          programId: program.id,
+          name: 'Semester 2026-I',
+          startDate: '2026-03-01',
+          endDate: '2026-07-31',
+        })
+        .expect(201);
+
+      expect(response.body.data).toMatchObject({
+        programId: program.id,
+        name: 'Semester 2026-I',
+        status: 'UPCOMING',
+      });
+    });
+
+    it('rejects when programId is missing', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['term.create', 'term.read'],
+        'create-no-program',
+      );
+
       const response = await request(app.getHttpServer())
         .post('/terms')
         .set('Authorization', `Bearer ${token}`)
@@ -108,11 +147,11 @@ describe('Terms', () => {
           startDate: '2026-03-01',
           endDate: '2026-07-31',
         })
-        .expect(201);
+        .expect(400);
 
-      expect(response.body.data).toMatchObject({
-        name: 'Semester 2026-I',
-        status: 'UPCOMING',
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        path: '/terms',
       });
     });
 
@@ -124,10 +163,13 @@ describe('Terms', () => {
         'create-bad-dates',
       );
 
+      const program = await createProgram(prisma, tag());
+
       const response = await request(app.getHttpServer())
         .post('/terms')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          programId: program.id,
           name: 'Bad Term',
           startDate: '2026-07-31',
           endDate: '2026-03-01',
@@ -150,10 +192,13 @@ describe('Terms', () => {
         'create-no-perm',
       );
 
+      const program = await createProgram(prisma, tag());
+
       const response = await request(app.getHttpServer())
         .post('/terms')
         .set('Authorization', `Bearer ${token}`)
         .send({
+          programId: program.id,
           name: 'Semester 2026-I',
           startDate: '2026-03-01',
           endDate: '2026-07-31',
@@ -180,6 +225,7 @@ describe('Terms', () => {
 
       await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Upcoming Term',
           startDate: new Date('2026-09-01'),
           endDate: new Date('2026-12-31'),
@@ -189,6 +235,7 @@ describe('Terms', () => {
 
       await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Active Term',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -203,6 +250,49 @@ describe('Terms', () => {
 
       expect(response.body.data).toHaveLength(1);
       expect(response.body.data[0].name).toBe('Active Term');
+    });
+
+    it('filters terms by programId query param', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['term.read'],
+        'list-by-program',
+      );
+
+      const programA = await createProgram(prisma, tag());
+      const programB = await createProgram(prisma, tag());
+
+      await prisma.term.create({
+        data: {
+          programId: programA.id,
+          name: 'A Term',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      await prisma.term.create({
+        data: {
+          programId: programB.id,
+          name: 'B Term',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/terms?programId=${programA.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
+        programId: programA.id,
+        name: 'A Term',
+      });
     });
 
     it('returns 404 for non-existent term ID', async () => {
@@ -236,6 +326,7 @@ describe('Terms', () => {
 
       await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Current Semester',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -253,6 +344,49 @@ describe('Terms', () => {
         status: 'ACTIVE',
       });
     });
+
+    it('returns the active term scoped by program', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['term.read'],
+        'get-active-by-program',
+      );
+
+      const programA = await createProgram(prisma, tag());
+      const programB = await createProgram(prisma, tag());
+
+      await prisma.term.create({
+        data: {
+          programId: programA.id,
+          name: 'Active A',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      await prisma.term.create({
+        data: {
+          programId: programB.id,
+          name: 'Active B',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/terms/active?programId=${programB.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        programId: programB.id,
+        name: 'Active B',
+        status: 'ACTIVE',
+      });
+    });
   });
 
   describe('PATCH /terms/:id', () => {
@@ -266,6 +400,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Old Name',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -292,6 +427,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Closed Term',
           startDate: new Date('2025-03-01'),
           endDate: new Date('2025-07-31'),
@@ -325,6 +461,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Spring 2026',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -351,6 +488,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Spring 2026',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -372,7 +510,7 @@ describe('Terms', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
-    it('rejects activating a second term while another is ACTIVE', async () => {
+    it('rejects activating a second term while another is ACTIVE in the same program', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
@@ -380,8 +518,11 @@ describe('Terms', () => {
         'status-conflict',
       );
 
+      const program = await createProgram(prisma, tag());
+
       await prisma.term.create({
         data: {
+          programId: program.id,
           name: 'Active Spring',
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -391,6 +532,7 @@ describe('Terms', () => {
 
       const second = await prisma.term.create({
         data: {
+          programId: program.id,
           name: 'Summer 2026',
           startDate: new Date('2026-08-01'),
           endDate: new Date('2026-12-31'),
@@ -411,6 +553,49 @@ describe('Terms', () => {
       });
       expect(response.body).toHaveProperty('timestamp');
     });
+
+    it('allows one ACTIVE term per program', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['term.close', 'term.read'],
+        'status-per-program',
+      );
+
+      const programA = await createProgram(prisma, tag());
+      const programB = await createProgram(prisma, tag());
+
+      await prisma.term.create({
+        data: {
+          programId: programA.id,
+          name: 'Active A',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+
+      const second = await prisma.term.create({
+        data: {
+          programId: programB.id,
+          name: 'Active B',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'UPCOMING',
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .patch(`/terms/${second.id}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'ACTIVE' })
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        programId: programB.id,
+        status: 'ACTIVE',
+      });
+    });
   });
 
   describe('DELETE /terms/:id', () => {
@@ -424,6 +609,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'To Delete',
           startDate: new Date('2026-09-01'),
           endDate: new Date('2026-12-31'),
@@ -450,6 +636,7 @@ describe('Terms', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: (await createProgram(prisma, tag())).id,
           name: 'Protected',
           startDate: new Date('2026-09-01'),
           endDate: new Date('2026-12-31'),

@@ -4,12 +4,20 @@ import {
   IsNotEmpty,
   IsOptional,
   IsISO8601,
+  IsUUID,
   MaxLength,
   IsEnum,
 } from 'class-validator';
 import { TermStatus } from '@prisma/client';
 
 export class CreateTermDto {
+  @ApiProperty({
+    description: 'Program the term belongs to',
+    example: '3f2c1b4a-0000-4000-8000-000000000000',
+  })
+  @IsUUID()
+  public readonly programId: string;
+
   @ApiProperty({ example: 'Semester 2026-I' })
   @IsString()
   @IsNotEmpty()
@@ -53,6 +61,9 @@ export class ChangeTermStatusDto {
 export class TermResponseDto {
   @ApiProperty()
   public id: string;
+
+  @ApiProperty()
+  public programId: string;
 
   @ApiProperty()
   public name: string;

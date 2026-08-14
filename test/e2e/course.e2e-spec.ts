@@ -641,6 +641,7 @@ describe('Courses', () => {
       });
       const term = await prisma.term.create({
         data: {
+          programId: program.id,
           name: `Term ${tag()}`,
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),

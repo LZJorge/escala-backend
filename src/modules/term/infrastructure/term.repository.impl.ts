@@ -13,6 +13,7 @@ export class PrismaTermRepository implements TermRepository {
     const record = await this.prisma.term.create({
       data: {
         id: term.id,
+        programId: term.programId,
         name: term.name,
         startDate: term.startDate,
         endDate: term.endDate,
@@ -23,11 +24,14 @@ export class PrismaTermRepository implements TermRepository {
     return this.toEntity(record);
   }
 
-  public async findAll(status?: string): Promise<Term[]> {
+  public async findAll(status?: string, programId?: string): Promise<Term[]> {
     const where: Record<string, unknown> = { deletedAt: null };
 
     if (status) {
       where.status = status;
+    }
+    if (programId) {
+      where.programId = programId;
     }
 
     const records = await this.prisma.term.findMany({
@@ -50,9 +54,13 @@ export class PrismaTermRepository implements TermRepository {
     return this.toEntity(record);
   }
 
-  public async findActive(): Promise<Term | null> {
+  public async findActive(programId?: string): Promise<Term | null> {
     const record = await this.prisma.term.findFirst({
-      where: { status: 'ACTIVE', deletedAt: null },
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        ...(programId ? { programId } : {}),
+      },
     });
 
     if (!record) {
@@ -66,6 +74,7 @@ export class PrismaTermRepository implements TermRepository {
     const record = await this.prisma.term.update({
       where: { id: term.id },
       data: {
+        programId: term.programId,
         name: term.name,
         startDate: term.startDate,
         endDate: term.endDate,
@@ -92,6 +101,7 @@ export class PrismaTermRepository implements TermRepository {
   private toEntity(record: PrismaTerm): Term {
     return new Term(
       {
+        programId: record.programId,
         name: record.name,
         startDate: record.startDate,
         endDate: record.endDate,

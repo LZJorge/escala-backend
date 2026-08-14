@@ -13,6 +13,7 @@ import { RedisServiceMock } from '../utils/mocks/redis.mock';
 
 function buildTerm(
   overrides: Partial<{
+    programId: string;
     name: string;
     startDate: Date;
     endDate: Date;
@@ -22,6 +23,7 @@ function buildTerm(
 ): Term {
   return new Term(
     {
+      programId: 'prog-1',
       name: 'Semester 2026-I',
       startDate: new Date('2026-03-01'),
       endDate: new Date('2026-07-31'),
@@ -117,13 +119,17 @@ describe('Term (e2e)', () => {
 
     it('returns 201 when creating a term', async () => {
       termRepoMock.create.mockResolvedValue(
-        buildTerm({ name: 'Semester 2026-I' }, 'term-1'),
+        buildTerm(
+          { name: 'Semester 2026-I', programId: '3f2c1b4a-0000-4000-8000-000000000000' },
+          'term-1',
+        ),
       );
 
       const response = await request(app.getHttpServer())
         .post(url)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
+          programId: '3f2c1b4a-0000-4000-8000-000000000000',
           name: 'Semester 2026-I',
           startDate: '2026-03-01',
           endDate: '2026-07-31',
@@ -132,6 +138,9 @@ describe('Term (e2e)', () => {
 
       expect(response.body.data.id).toBe('term-1');
       expect(response.body.data.status).toBe('UPCOMING');
+      expect(response.body.data.programId).toBe(
+        '3f2c1b4a-0000-4000-8000-000000000000',
+      );
     });
 
     it('returns 401 without token', async () => {

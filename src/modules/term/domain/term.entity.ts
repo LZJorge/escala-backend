@@ -2,6 +2,7 @@ import { Entity } from '@core/domain/entity.base';
 import type { TermStatus } from '@prisma/client';
 
 export interface TermProps {
+  programId: string;
   name: string;
   startDate: Date;
   endDate: Date;
@@ -9,6 +10,10 @@ export interface TermProps {
 }
 
 export class Term extends Entity<TermProps> {
+  public get programId(): string {
+    return this.props.programId;
+  }
+
   public get name(): string {
     return this.props.name;
   }

@@ -59,10 +59,12 @@ export class TermController {
     required: false,
     enum: ['UPCOMING', 'ACTIVE', 'CLOSED'],
   })
+  @ApiQuery({ name: 'programId', required: false, type: String })
   public async findAll(
     @Query('status') status?: string,
+    @Query('programId') programId?: string,
   ): Promise<TermResponseDto[]> {
-    const result = await this.service.findAll(status);
+    const result = await this.service.findAll(status, programId);
 
     return result.value;
   }
@@ -71,8 +73,11 @@ export class TermController {
   @RequirePermission('term.read')
   @ApiOperation({ summary: 'Get the currently active term' })
   @ApiOkResponse({ type: TermResponseDto })
-  public async findActive(): Promise<TermResponseDto | null> {
-    const result = await this.service.findActive();
+  @ApiQuery({ name: 'programId', required: false, type: String })
+  public async findActive(
+    @Query('programId') programId?: string,
+  ): Promise<TermResponseDto | null> {
+    const result = await this.service.findActive(programId);
 
     return result.value;
   }
@@ -138,7 +143,7 @@ export class TermController {
         throw new DomainException(ErrorCodes.ERR_TERM_NOT_FOUND, result.error);
       }
 
-      if (result.error === 'Another term is already active') {
+      if (result.error?.startsWith('Another term is already active')) {
         throw new DomainException(
           ErrorCodes.ERR_TERM_ALREADY_ACTIVE,
           result.error,

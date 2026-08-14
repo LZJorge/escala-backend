@@ -18,13 +18,37 @@ export class TermService {
     private readonly repository: TermRepository,
   ) {}
 
+  private toResponse(term: Term): {
+    id: string;
+    programId: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  } {
+    return {
+      id: term.id,
+      programId: term.programId,
+      name: term.name,
+      startDate: term.startDate.toISOString(),
+      endDate: term.endDate.toISOString(),
+      status: term.status,
+      createdAt: term.createdAt.toISOString(),
+      updatedAt: term.updatedAt.toISOString(),
+    };
+  }
+
   public async create(params: {
+    programId: string;
     name: string;
     startDate: string;
     endDate: string;
   }): Promise<
     Result<{
       id: string;
+      programId: string;
       name: string;
       startDate: string;
       endDate: string;
@@ -41,6 +65,7 @@ export class TermService {
     }
 
     const term = new Term({
+      programId: params.programId,
       name: params.name,
       startDate: start,
       endDate: end,
@@ -49,21 +74,17 @@ export class TermService {
 
     const saved = await this.repository.create(term);
 
-    return Result.ok({
-      id: saved.id,
-      name: saved.name,
-      startDate: saved.startDate.toISOString(),
-      endDate: saved.endDate.toISOString(),
-      status: saved.status,
-      createdAt: saved.createdAt.toISOString(),
-      updatedAt: saved.updatedAt.toISOString(),
-    });
+    return Result.ok(this.toResponse(saved));
   }
 
-  public async findAll(status?: string): Promise<
+  public async findAll(
+    status?: string,
+    programId?: string,
+  ): Promise<
     Result<
       Array<{
         id: string;
+        programId: string;
         name: string;
         startDate: string;
         endDate: string;
@@ -73,24 +94,15 @@ export class TermService {
       }>
     >
   > {
-    const terms = await this.repository.findAll(status);
+    const terms = await this.repository.findAll(status, programId);
 
-    return Result.ok(
-      terms.map((t: Term) => ({
-        id: t.id,
-        name: t.name,
-        startDate: t.startDate.toISOString(),
-        endDate: t.endDate.toISOString(),
-        status: t.status,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
-      })),
-    );
+    return Result.ok(terms.map((t: Term) => this.toResponse(t)));
   }
 
-  public async findActive(): Promise<
+  public async findActive(programId?: string): Promise<
     Result<{
       id: string;
+      programId: string;
       name: string;
       startDate: string;
       endDate: string;
@@ -99,26 +111,19 @@ export class TermService {
       updatedAt: string;
     } | null>
   > {
-    const term = await this.repository.findActive();
+    const term = await this.repository.findActive(programId);
 
     if (!term) {
       return Result.ok(null);
     }
 
-    return Result.ok({
-      id: term.id,
-      name: term.name,
-      startDate: term.startDate.toISOString(),
-      endDate: term.endDate.toISOString(),
-      status: term.status,
-      createdAt: term.createdAt.toISOString(),
-      updatedAt: term.updatedAt.toISOString(),
-    });
+    return Result.ok(this.toResponse(term));
   }
 
   public async findById(id: string): Promise<
     Result<{
       id: string;
+      programId: string;
       name: string;
       startDate: string;
       endDate: string;
@@ -133,15 +138,7 @@ export class TermService {
       return Result.fail('Term not found');
     }
 
-    return Result.ok({
-      id: term.id,
-      name: term.name,
-      startDate: term.startDate.toISOString(),
-      endDate: term.endDate.toISOString(),
-      status: term.status,
-      createdAt: term.createdAt.toISOString(),
-      updatedAt: term.updatedAt.toISOString(),
-    });
+    return Result.ok(this.toResponse(term));
   }
 
   public async update(
@@ -154,6 +151,7 @@ export class TermService {
   ): Promise<
     Result<{
       id: string;
+      programId: string;
       name: string;
       startDate: string;
       endDate: string;
@@ -183,6 +181,7 @@ export class TermService {
 
     const updated = new Term(
       {
+        programId: existing.programId,
         name: params.name ?? existing.name,
         startDate: start,
         endDate: end,
@@ -193,15 +192,7 @@ export class TermService {
 
     const saved = await this.repository.update(updated);
 
-    return Result.ok({
-      id: saved.id,
-      name: saved.name,
-      startDate: saved.startDate.toISOString(),
-      endDate: saved.endDate.toISOString(),
-      status: saved.status,
-      createdAt: saved.createdAt.toISOString(),
-      updatedAt: saved.updatedAt.toISOString(),
-    });
+    return Result.ok(this.toResponse(saved));
   }
 
   public async changeStatus(
@@ -210,6 +201,7 @@ export class TermService {
   ): Promise<
     Result<{
       id: string;
+      programId: string;
       name: string;
       startDate: string;
       endDate: string;
@@ -233,15 +225,16 @@ export class TermService {
     }
 
     if (newStatus === 'ACTIVE') {
-      const activeTerm = await this.repository.findActive();
+      const activeTerm = await this.repository.findActive(existing.programId);
 
       if (activeTerm && activeTerm.id !== id) {
-        return Result.fail('Another term is already active');
+        return Result.fail('Another term is already active in this program');
       }
     }
 
     const updated = new Term(
       {
+        programId: existing.programId,
         name: existing.name,
         startDate: existing.startDate,
         endDate: existing.endDate,
@@ -252,15 +245,7 @@ export class TermService {
 
     const saved = await this.repository.update(updated);
 
-    return Result.ok({
-      id: saved.id,
-      name: saved.name,
-      startDate: saved.startDate.toISOString(),
-      endDate: saved.endDate.toISOString(),
-      status: saved.status,
-      createdAt: saved.createdAt.toISOString(),
-      updatedAt: saved.updatedAt.toISOString(),
-    });
+    return Result.ok(this.toResponse(saved));
   }
 
   public async delete(id: string): Promise<Result<void>> {

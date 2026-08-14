@@ -106,8 +106,13 @@ describe('Sections', () => {
   }> {
     const suffix = t ?? tag();
 
+    const seedProgram = await prisma.program.create({
+      data: { name: `Sec Prog ${suffix}`, termType: 'SEMESTER' },
+    });
+
     const term = await prisma.term.create({
       data: {
+        programId: seedProgram.id,
         name: `Spring 2026 ${suffix}`,
         startDate: new Date('2026-03-01'),
         endDate: new Date('2026-07-31'),
@@ -117,6 +122,7 @@ describe('Sections', () => {
 
     const closedTerm = await prisma.term.create({
       data: {
+        programId: seedProgram.id,
         name: `Fall 2025 ${suffix}`,
         startDate: new Date('2025-08-01'),
         endDate: new Date('2025-12-31'),
@@ -648,8 +654,13 @@ describe('Sections', () => {
 
       const { termId, teacherId, courseId } = await seedData();
 
+      const otherProgram = await prisma.program.create({
+        data: { name: `Other Prog ${tag()}`, termType: 'SEMESTER' },
+      });
+
       const otherTerm = await prisma.term.create({
         data: {
+          programId: otherProgram.id,
           name: 'Summer 2027',
           startDate: new Date('2027-01-01'),
           endDate: new Date('2027-03-31'),

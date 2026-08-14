@@ -174,7 +174,7 @@ describe('Programs', () => {
 
   const tag = (): string => randomBytes(4).toString('hex');
 
-  async function createStudent(ci: string): Promise<string> {
+  async function createStudent(ci: string, programId: string): Promise<string> {
     const salt = randomBytes(16).toString('hex');
     const hash = scryptSync('student_password', salt, 64).toString('hex');
     const user = await prisma.user.create({
@@ -187,7 +187,7 @@ describe('Programs', () => {
       },
     });
     const profile = await prisma.studentProfile.create({
-      data: { userId: user.id },
+      data: { userId: user.id, programId },
     });
 
     return profile.id;
@@ -261,6 +261,7 @@ describe('Programs', () => {
 
       const term = await prisma.term.create({
         data: {
+          programId: otherProgram.id,
           name: `Term ${tag()}`,
           startDate: new Date('2026-03-01'),
           endDate: new Date('2026-07-31'),
@@ -283,8 +284,8 @@ describe('Programs', () => {
         data: { userId: teacherUser.id },
       });
 
-      const student1 = await createStudent('s1');
-      const student2 = await createStudent('s2');
+      const student1 = await createStudent('s1', program.id);
+      const student2 = await createStudent('s2', program.id);
 
       const sectionA = await prisma.courseSection.create({
         data: {
