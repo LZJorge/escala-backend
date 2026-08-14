@@ -248,8 +248,15 @@ describe('Users', () => {
           ci: 'student-filter-ci',
         },
       });
+      const filterProgram = await prisma.program.create({
+        data: { name: 'Filter Prog', termType: 'SEMESTER' },
+      });
       await prisma.studentProfile.create({
-        data: { userId: studentUser.id, enrollmentYear: 2026 },
+        data: {
+          userId: studentUser.id,
+          programId: filterProgram.id,
+          enrollmentYear: 2026,
+        },
       });
 
       await prisma.user.create({
@@ -313,8 +320,15 @@ describe('Users', () => {
           ci: '12345678',
         },
       });
+      const searchProgram = await prisma.program.create({
+        data: { name: 'Search Prog', termType: 'SEMESTER' },
+      });
       await prisma.studentProfile.create({
-        data: { userId: searchUser.id, enrollmentYear: 2025 },
+        data: {
+          userId: searchUser.id,
+          programId: searchProgram.id,
+          enrollmentYear: 2025,
+        },
       });
 
       const role = await prisma.role.create({
@@ -475,6 +489,10 @@ describe('Users', () => {
         'creator',
       );
 
+      const createProgram = await prisma.program.create({
+        data: { name: 'Create Prog', termType: 'SEMESTER' },
+      });
+
       const response = await request(app.getHttpServer())
         .post('/users')
         .set('Authorization', `Bearer ${token}`)
@@ -485,6 +503,7 @@ describe('Users', () => {
           lastName: 'User',
           ci: 'new-ci',
           profiles: ['STUDENT'],
+          programId: createProgram.id,
         })
         .expect(201);
 
@@ -691,11 +710,11 @@ describe('Users', () => {
           ci: 'different-ci',
           profiles: ['STUDENT'],
         })
-        .expect(422);
+        .expect(409);
 
       expect(response.body).toMatchObject({
         errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
-        statusCode: 422,
+        statusCode: 409,
       });
       expect(response.body.message).toContain('Email already in use');
     });
@@ -732,13 +751,657 @@ describe('Users', () => {
           ci: 'dup-ci',
           profiles: ['STUDENT'],
         })
-        .expect(422);
+        .expect(409);
 
       expect(response.body).toMatchObject({
         errorCode: ErrorCodes.ERR_USER_CI_EXISTS,
-        statusCode: 422,
+        statusCode: 409,
       });
       expect(response.body.message).toContain('CI already in use');
+    });
+  });
+
+  describe('GET /users academic filters and enrichment', () => {
+    it('returns enrollmentYear and programId on list items', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read', 'student.read'],
+        'enrich',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('enrich_password', salt, 64).toString('hex');
+
+      const program = await prisma.program.create({
+        data: { name: 'Ingenieria en Sistemas', termType: 'SEMESTER' },
+      });
+      const course = await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SIS-101',
+          name: 'Intro a Sistemas',
+          credits: 5,
+          termLevel: 1,
+        },
+      });
+      const term = await prisma.term.create({
+        data: {
+          programId: program.id,
+          name: 'Spring 2026',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+      const teacher = await prisma.user.create({
+        data: {
+          email: 'teacher-enrich@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Prof',
+          lastName: 'Enrich',
+          ci: 'teacher-enrich-ci',
+        },
+      });
+      const teacherProfile = await prisma.adminProfile.create({
+        data: { userId: teacher.id },
+      });
+      const section = await prisma.courseSection.create({
+        data: {
+          courseId: course.id,
+          termId: term.id,
+          teacherId: teacherProfile.id,
+          name: 'SIS-101-M1',
+          capacity: 30,
+        },
+      });
+      const student = await prisma.user.create({
+        data: {
+          email: 'student-enrich@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Student',
+          lastName: 'Enrich',
+          ci: 'student-enrich-ci',
+        },
+      });
+      const studentProfile = await prisma.studentProfile.create({
+        data: {
+          userId: student.id,
+          programId: program.id,
+          enrollmentYear: 2026,
+        },
+      });
+      await prisma.enrollment.create({
+        data: {
+          sectionId: section.id,
+          studentId: studentProfile.id,
+          status: 'ENROLLED',
+        },
+      });
+
+      const freshStudent = await prisma.user.create({
+        data: {
+          email: 'fresh-enrich@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Fresh',
+          lastName: 'Enrich',
+          ci: 'fresh-enrich-ci',
+        },
+      });
+      await prisma.studentProfile.create({
+        data: { userId: freshStudent.id, programId: program.id },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/users?q=enrich`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            email: 'student-enrich@test.edu',
+            enrollmentYear: 2026,
+            programId: program.id,
+          }),
+          expect.objectContaining({
+            email: 'fresh-enrich@test.edu',
+            programId: program.id,
+          }),
+        ]),
+      );
+      const nonStudent = response.body.data.find(
+        (u: { email: string }) => u.email === 'teacher-enrich@test.edu',
+      );
+      expect(nonStudent).toMatchObject({ programId: null });
+    });
+
+    it('filters by programId and academicStatus', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read', 'student.read'],
+        'acad-filter',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('acad_password', salt, 64).toString('hex');
+
+      const informatica = await prisma.program.create({
+        data: { name: 'Informatica', termType: 'SEMESTER' },
+      });
+      const medicina = await prisma.program.create({
+        data: { name: 'Medicina', termType: 'SEMESTER' },
+      });
+      const courseA = await prisma.course.create({
+        data: {
+          programId: informatica.id,
+          code: 'INF-101',
+          name: 'Programacion',
+          credits: 4,
+          termLevel: 1,
+        },
+      });
+      const courseB = await prisma.course.create({
+        data: {
+          programId: medicina.id,
+          code: 'MED-101',
+          name: 'Anatomia',
+          credits: 4,
+          termLevel: 1,
+        },
+      });
+      const term = await prisma.term.create({
+        data: {
+          programId: medicina.id,
+          name: 'Spring 2026',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+      const teacher = await prisma.user.create({
+        data: {
+          email: 'teacher-acad@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Prof',
+          lastName: 'Acad',
+          ci: 'teacher-acad-ci',
+        },
+      });
+      const teacherProfile = await prisma.adminProfile.create({
+        data: { userId: teacher.id },
+      });
+      const sectionA = await prisma.courseSection.create({
+        data: {
+          courseId: courseA.id,
+          termId: term.id,
+          teacherId: teacherProfile.id,
+          name: 'INF-M1',
+          capacity: 30,
+        },
+      });
+      const sectionB = await prisma.courseSection.create({
+        data: {
+          courseId: courseB.id,
+          termId: term.id,
+          teacherId: teacherProfile.id,
+          name: 'MED-M1',
+          capacity: 30,
+        },
+      });
+
+      const enrolled = await prisma.user.create({
+        data: {
+          email: 'enrolled-acad@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Enrolled',
+          lastName: 'Acad',
+          ci: 'enrolled-acad-ci',
+        },
+      });
+      const enrolledProfile = await prisma.studentProfile.create({
+        data: { userId: enrolled.id, programId: informatica.id },
+      });
+      await prisma.enrollment.create({
+        data: {
+          sectionId: sectionA.id,
+          studentId: enrolledProfile.id,
+          status: 'ENROLLED',
+        },
+      });
+
+      const withdrawn = await prisma.user.create({
+        data: {
+          email: 'withdrawn-acad@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Withdrawn',
+          lastName: 'Acad',
+          ci: 'withdrawn-acad-ci',
+        },
+      });
+      const withdrawnProfile = await prisma.studentProfile.create({
+        data: { userId: withdrawn.id, programId: medicina.id },
+      });
+      await prisma.enrollment.create({
+        data: {
+          sectionId: sectionB.id,
+          studentId: withdrawnProfile.id,
+          status: 'WITHDRAWN',
+        },
+      });
+
+      const direct = await prisma.user.create({
+        data: {
+          email: 'direct-acad@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Direct',
+          lastName: 'Acad',
+          ci: 'direct-acad-ci',
+        },
+      });
+      await prisma.studentProfile.create({
+        data: { userId: direct.id, programId: informatica.id },
+      });
+
+      const byProgram = await request(app.getHttpServer())
+        .get(`/users?programId=${informatica.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const byProgramEmails = byProgram.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(byProgramEmails).toContain('enrolled-acad@test.edu');
+      expect(byProgramEmails).toContain('direct-acad@test.edu');
+      expect(byProgramEmails).not.toContain('withdrawn-acad@test.edu');
+
+      const byStatus = await request(app.getHttpServer())
+        .get(`/users?academicStatus=WITHDRAWN`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const byStatusEmails = byStatus.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(byStatusEmails).toContain('withdrawn-acad@test.edu');
+      expect(byStatusEmails).not.toContain('enrolled-acad@test.edu');
+
+      const combined = await request(app.getHttpServer())
+        .get(`/users?programId=${medicina.id}&academicStatus=WITHDRAWN`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const combinedEmails = combined.body.data.map(
+        (u: { email: string }) => u.email,
+      );
+      expect(combinedEmails).toContain('withdrawn-acad@test.edu');
+    });
+  });
+
+  describe('GET /users/:userId/academic-snapshot', () => {
+    it('returns active-term sections and passed credits', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['student.read'],
+        'snapshot-reader',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('snap_password', salt, 64).toString('hex');
+
+      const program = await prisma.program.create({
+        data: { name: 'Snapshot Prog', termType: 'SEMESTER' },
+      });
+      const course = await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SNAP-101',
+          name: 'Calculo I',
+          credits: 4,
+          termLevel: 1,
+        },
+      });
+      const activeTerm = await prisma.term.create({
+        data: {
+          programId: program.id,
+          name: 'Active 2026',
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-07-31'),
+          status: 'ACTIVE',
+        },
+      });
+      const closedTerm = await prisma.term.create({
+        data: {
+          programId: program.id,
+          name: 'Closed 2025',
+          startDate: new Date('2025-03-01'),
+          endDate: new Date('2025-07-31'),
+          status: 'CLOSED',
+        },
+      });
+      const teacher = await prisma.user.create({
+        data: {
+          email: 'teacher-snap@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Prof',
+          lastName: 'Snap',
+          ci: 'teacher-snap-ci',
+        },
+      });
+      const teacherProfile = await prisma.adminProfile.create({
+        data: { userId: teacher.id },
+      });
+      const activeSection = await prisma.courseSection.create({
+        data: {
+          courseId: course.id,
+          termId: activeTerm.id,
+          teacherId: teacherProfile.id,
+          name: 'CAL-M1',
+          capacity: 30,
+        },
+      });
+      const closedSection = await prisma.courseSection.create({
+        data: {
+          courseId: course.id,
+          termId: closedTerm.id,
+          teacherId: teacherProfile.id,
+          name: 'CAL-M0',
+          capacity: 30,
+        },
+      });
+      const student = await prisma.user.create({
+        data: {
+          email: 'student-snap@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Student',
+          lastName: 'Snap',
+          ci: 'student-snap-ci',
+        },
+      });
+      const studentProfile = await prisma.studentProfile.create({
+        data: { userId: student.id, programId: program.id },
+      });
+      await prisma.enrollment.create({
+        data: {
+          sectionId: activeSection.id,
+          studentId: studentProfile.id,
+          status: 'ENROLLED',
+        },
+      });
+      await prisma.enrollment.create({
+        data: {
+          sectionId: closedSection.id,
+          studentId: studentProfile.id,
+          status: 'ENROLLED',
+        },
+      });
+      await prisma.transcript.create({
+        data: {
+          studentId: studentProfile.id,
+          courseId: course.id,
+          termId: closedTerm.id,
+          finalGrade: 90,
+          status: 'PASSED',
+        },
+      });
+      const failedCourse = await prisma.course.create({
+        data: {
+          programId: program.id,
+          code: 'SNAP-102',
+          name: 'Fisica',
+          credits: 3,
+          termLevel: 2,
+        },
+      });
+      await prisma.transcript.create({
+        data: {
+          studentId: studentProfile.id,
+          courseId: failedCourse.id,
+          termId: closedTerm.id,
+          finalGrade: 40,
+          status: 'FAILED',
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/users/${student.id}/academic-snapshot`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.data).toMatchObject({
+        sections: [
+          {
+            sectionName: 'CAL-M1',
+            courseName: 'Calculo I',
+            teacherName: 'Prof Snap',
+          },
+        ],
+        passedCredits: 4,
+      });
+    });
+
+    it('returns 403 without student.read permission', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read'],
+        'snapshot-denied',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('snap_password', salt, 64).toString('hex');
+
+      const user = await prisma.user.create({
+        data: {
+          email: 'victim@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Victim',
+          lastName: 'User',
+          ci: 'victim-ci',
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/users/${user.id}/academic-snapshot`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+      });
+    });
+  });
+
+  describe('POST /users/students', () => {
+    it('registers a student atomically with CI as default password', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['student.create', 'student.read', 'user.read'],
+        'student-registrar',
+      );
+
+      const program = await prisma.program.create({
+        data: { name: 'Ingenieria Civil', termType: 'SEMESTER' },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/users/students')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          firstName: 'Carlos',
+          lastName: 'Rojas',
+          email: 'carlos.rojas@test.edu',
+          ci: '87654321',
+          programId: program.id,
+        })
+        .expect(201);
+
+      expect(response.body.data).toMatchObject({
+        email: 'carlos.rojas@test.edu',
+        program: 'Ingenieria Civil',
+        message: 'Student registered successfully',
+      });
+
+      const created = await prisma.user.findUnique({
+        where: { email: 'carlos.rojas@test.edu' },
+        include: { studentProfile: true },
+      });
+      expect(created).not.toBeNull();
+      expect(created?.studentProfile).not.toBeNull();
+      expect(created?.studentProfile?.programId).toBe(program.id);
+      const now = new Date();
+      expect(created?.studentProfile?.enrollmentYear).toBe(now.getFullYear());
+      expect(created?.studentProfile?.enrollmentMonth).toBe(now.getMonth() + 1);
+
+      const salt = (created?.password ?? '').split(':')[0];
+      const hash = (created?.password ?? '').split(':')[1];
+      const expectedHash = scryptSync('87654321', salt, 64).toString('hex');
+      expect(hash).toBe(expectedHash);
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'carlos.rojas@test.edu', password: '87654321' })
+        .expect(200);
+      expect(loginResponse.body.data.accessToken).toBeDefined();
+    });
+
+    it('returns 409 when the email is already in use', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['student.create', 'student.read', 'user.read'],
+        'student-registrar-409a',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('dup_password', salt, 64).toString('hex');
+
+      await prisma.user.create({
+        data: {
+          email: 'dup@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Dup',
+          lastName: 'User',
+          ci: 'dup-ci',
+        },
+      });
+
+      const program = await prisma.program.create({
+        data: { name: 'Dup Prog', termType: 'SEMESTER' },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/users/students')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          firstName: 'Dup',
+          lastName: 'User',
+          email: 'dup@test.edu',
+          ci: 'other-ci',
+          programId: program.id,
+        })
+        .expect(409);
+
+      expect(response.body).toMatchObject({
+        statusCode: 409,
+        errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
+      });
+    });
+
+    it('returns 409 when the CI is already registered', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['student.create', 'student.read', 'user.read'],
+        'student-registrar-409b',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('dup_password', salt, 64).toString('hex');
+
+      await prisma.user.create({
+        data: {
+          email: 'taken@test.edu',
+          password: `${salt}:${hash}`,
+          firstName: 'Taken',
+          lastName: 'User',
+          ci: '11111111',
+        },
+      });
+
+      const program = await prisma.program.create({
+        data: { name: 'Taken Prog', termType: 'SEMESTER' },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/users/students')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          firstName: 'New',
+          lastName: 'Student',
+          email: 'new@test.edu',
+          ci: '11111111',
+          programId: program.id,
+        })
+        .expect(409);
+
+      expect(response.body).toMatchObject({
+        statusCode: 409,
+        errorCode: ErrorCodes.ERR_USER_CI_EXISTS,
+      });
+    });
+
+    it('returns 404 when the program does not exist', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['student.create', 'student.read', 'user.read'],
+        'student-registrar-404',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/users/students')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          firstName: 'Ghost',
+          lastName: 'Student',
+          email: 'ghost@test.edu',
+          ci: '99999999',
+          programId: '3f2c1b4a-0000-4000-8000-000000000000',
+        })
+        .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+      });
+    });
+
+    it('returns 403 without student.create permission', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read'],
+        'student-denied',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/users/students')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          firstName: 'No',
+          lastName: 'Permission',
+          email: 'noperm-student@test.edu',
+          ci: '12340001',
+          programId: '3f2c1b4a-0000-4000-8000-000000000000',
+        })
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+      });
     });
   });
 });

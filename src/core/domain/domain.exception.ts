@@ -11,6 +11,8 @@ const STATUS_MAP: Record<string, HttpStatus> = {
   [ErrorCodes.ERR_TERM_ALREADY_ACTIVE]: HttpStatus.CONFLICT,
   [ErrorCodes.ERR_SECTION_SCHEDULE_CONFLICT]: HttpStatus.CONFLICT,
   [ErrorCodes.ERR_SECTION_DELETE_FAILED]: HttpStatus.CONFLICT,
+  [ErrorCodes.ERR_USER_EMAIL_EXISTS]: HttpStatus.CONFLICT,
+  [ErrorCodes.ERR_USER_CI_EXISTS]: HttpStatus.CONFLICT,
   [ErrorCodes.ERR_CONFLICT]: HttpStatus.CONFLICT,
   [ErrorCodes.ERR_VALIDATION_FAILED]: HttpStatus.BAD_REQUEST,
   [ErrorCodes.SYS_INTERNAL_ERROR]: HttpStatus.INTERNAL_SERVER_ERROR,

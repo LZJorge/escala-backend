@@ -24,8 +24,13 @@ import { RoleService } from '@modules/role/application/role.service';
 import { UpdateProfileDto } from '../application/update-profile.dto';
 import { UserProfileDto } from '../application/user-profile.dto';
 import { CreateUserDto } from '../application/create-user.dto';
+import { CreateStudentDto } from '../application/create-student.dto';
 import { AssignRoleDto } from '../application/assign-role.dto';
-import { UserListItem, UserListFilter } from '../domain/user.repository';
+import {
+  UserListItem,
+  UserListFilter,
+  AcademicSnapshot,
+} from '../domain/user.repository';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 import { Page } from '@core/domain/page';
 import { DomainException } from '@core/domain/domain.exception';
@@ -61,6 +66,8 @@ export class UserController {
         query.isActive === undefined ? undefined : query.isActive === 'true',
       roleId: query.roleId,
       enrollmentYear: query.enrollmentYear,
+      programId: query.programId,
+      academicStatus: query.academicStatus,
       createdFrom:
         query.createdFrom === undefined
           ? undefined
@@ -73,6 +80,29 @@ export class UserController {
       pageSize: query.pageSize,
       filter,
     });
+    return result.value;
+  }
+
+  @Get(':userId/academic-snapshot')
+  @RequirePermission('student.read')
+  @ApiOperation({
+    summary:
+      'Academic snapshot for the quick-audit side panel (active-term sections + passed credits)',
+  })
+  @ApiOkResponse({
+    description: 'Course sections in the active term + total passed credits',
+  })
+  @ApiErrors(401, 403, 404)
+  public async getAcademicSnapshot(
+    @Param('userId') userId: string,
+  ): Promise<AcademicSnapshot> {
+    const result = await this.userService.getAcademicSnapshot(userId);
+    if (result.isFailure) {
+      throw new DomainException(
+        ErrorCodes.ERR_USER_NOT_FOUND,
+        result.error as string,
+      );
+    }
     return result.value;
   }
 
@@ -145,6 +175,36 @@ export class UserController {
     return result.value;
   }
 
+  @Post('students')
+  @RequirePermission('student.create')
+  @ApiOperation({
+    summary:
+      'Register a student atomically (User + StudentProfile), CI as default password',
+  })
+  @ApiErrors(401, 403, 404, 409)
+  public async createStudent(@Body() body: CreateStudentDto): Promise<{
+    id: string;
+    email: string;
+    program: string;
+    message: string;
+  }> {
+    const result = await this.userService.createStudent(body);
+    if (result.isFailure) {
+      const errorMessage = result.error as string;
+      if (errorMessage.includes('Email')) {
+        throw new DomainException(
+          ErrorCodes.ERR_USER_EMAIL_EXISTS,
+          errorMessage,
+        );
+      }
+      if (errorMessage.includes('CI')) {
+        throw new DomainException(ErrorCodes.ERR_USER_CI_EXISTS, errorMessage);
+      }
+      throw new DomainException(ErrorCodes.ERR_PROGRAM_NOT_FOUND, errorMessage);
+    }
+    return result.value;
+  }
+
   @Post()
   @RequirePermission('user.create')
   @ApiOperation({ summary: 'Create a new user (optionally with roles)' })
@@ -170,6 +230,12 @@ export class UserController {
       }
       if (errorMessage.includes('CI')) {
         throw new DomainException(ErrorCodes.ERR_USER_CI_EXISTS, errorMessage);
+      }
+      if (errorMessage.toLowerCase().includes('program')) {
+        throw new DomainException(
+          ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+          errorMessage,
+        );
       }
       throw new DomainException(
         ErrorCodes.ERR_USER_CREATION_FAILED,

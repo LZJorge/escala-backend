@@ -459,6 +459,14 @@ describe('User (e2e)', () => {
       lastName: 'User',
       ci: '87654321',
       profiles: ['STUDENT'],
+      programId: '3f2c1b4a-0000-4000-8000-000000000000',
+    };
+
+    const mockProgramExists = (): void => {
+      prismaMock.program.findUnique.mockResolvedValue({
+        id: '3f2c1b4a-0000-4000-8000-000000000000',
+        name: 'Engineering',
+      });
     };
 
     it('returns 201 when user is created', async () => {
@@ -479,6 +487,7 @@ describe('User (e2e)', () => {
       prismaMock.studentProfile.create.mockResolvedValue({
         id: 'student-profile-id',
       });
+      mockProgramExists();
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -511,10 +520,10 @@ describe('User (e2e)', () => {
         .post(createUrl)
         .set('Authorization', `Bearer ${regularToken}`)
         .send(validPayload)
-        .expect(422);
+        .expect(409);
 
       expect(response.body).toMatchObject({
-        statusCode: 422,
+        statusCode: 409,
         errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
         path: createUrl,
       });
@@ -598,6 +607,7 @@ describe('User (e2e)', () => {
       prismaMock.studentProfile.create.mockResolvedValue({
         id: 'student-profile-id',
       });
+      mockProgramExists();
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -610,7 +620,12 @@ describe('User (e2e)', () => {
       expect(response.body.data.adminProfileId).toBeNull();
       expect(prismaMock.adminProfile.create).not.toHaveBeenCalled();
       expect(prismaMock.studentProfile.create).toHaveBeenCalledWith({
-        data: { userId: expect.any(String) },
+        data: {
+          userId: expect.any(String),
+          programId: '3f2c1b4a-0000-4000-8000-000000000000',
+          enrollmentYear: expect.any(Number),
+          enrollmentMonth: expect.any(Number),
+        },
       });
     });
 
@@ -669,6 +684,7 @@ describe('User (e2e)', () => {
       prismaMock.studentProfile.create.mockResolvedValue({
         id: 'student-profile-id',
       });
+      mockProgramExists();
 
       const response = await request(app.getHttpServer())
         .post(createUrl)
@@ -679,6 +695,65 @@ describe('User (e2e)', () => {
       expect(response.body.data.profiles).toEqual(['ADMIN', 'STUDENT']);
       expect(response.body.data.adminProfileId).toBe('admin-profile-id');
       expect(response.body.data.studentProfileId).toBe('student-profile-id');
+    });
+
+    it('rejects a student user without programId with 404', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ ...validPayload, programId: undefined })
+        .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: createUrl,
+      });
+      expect(userRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects a student user with an unknown program with 404', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      prismaMock.program.findUnique.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(404);
+
+      expect(response.body).toMatchObject({
+        statusCode: 404,
+        errorCode: ErrorCodes.ERR_PROGRAM_NOT_FOUND,
+        path: createUrl,
+      });
+      expect(userRepositoryMock.save).not.toHaveBeenCalled();
     });
 
     it('rejects a user without any profile with 422', async () => {

@@ -14,6 +14,7 @@ const PERMISSIONS: Array<{ code: string; module: string; description: string }> 
   { code: 'user.update', module: 'user', description: 'Update user profiles in the institution' },
   { code: 'user.delete', module: 'user', description: 'Remove users from the institution' },
   { code: 'student.read', module: 'student', description: 'View students' },
+  { code: 'student.create', module: 'student', description: 'Register students' },
   { code: 'role.create', module: 'role', description: 'Create custom roles' },
   { code: 'role.read', module: 'role', description: 'View roles and their permissions' },
   { code: 'role.update', module: 'role', description: 'Modify role permissions' },
@@ -88,7 +89,6 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
     for (const code of def.permissions) {
       const permission = await prisma.permission.findUnique({ where: { code } });
       if (!permission) {
-        console.warn(`Permission ${code} not found. Skipping for role ${def.name}.`);
         continue;
       }
       permissionIds.push(permission.id);
@@ -103,7 +103,6 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
     });
 
     roles.push({ id: role.id, name: role.name });
-    console.log(`Role ready: ${role.name}`);
   }
 
   const demoUsers: Array<{
@@ -185,7 +184,6 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
       where: { email: demo.email },
     });
     if (existing) {
-      console.log(`Demo user ${demo.email} already exists. Skipping.`);
       continue;
     }
 
@@ -216,9 +214,18 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
     }
 
     if (demo.studentProfile) {
+      const demoProgram = await prisma.program.findFirst({
+        where: { name: DEMO_PROGRAM_NAME, deletedAt: null },
+      });
+      if (!demoProgram) {
+        throw new Error(
+          `Demo program ${DEMO_PROGRAM_NAME} must exist before demo students`,
+        );
+      }
       await prisma.studentProfile.create({
         data: {
           userId: user.id,
+          programId: demoProgram.id,
           enrollmentYear: demo.studentProfile.enrollmentYear,
         },
       });
@@ -395,9 +402,9 @@ async function seed(): Promise<void> {
     console.log('Institution already exists. Skipping.');
   }
 
-  await createDemoUsers(prisma);
-
   await createDemoProgram(prisma);
+
+  await createDemoUsers(prisma);
 
   await prisma.$disconnect();
 }

@@ -19,9 +19,14 @@ export class UserListGuard implements CanActivate {
     const query = request.query as {
       profile?: string;
       enrollmentYear?: string;
+      programId?: string;
+      academicStatus?: string;
     };
     const isStudentFilter =
-      query.profile === 'STUDENT' || query.enrollmentYear !== undefined;
+      query.profile === 'STUDENT' ||
+      query.enrollmentYear !== undefined ||
+      query.programId !== undefined ||
+      query.academicStatus !== undefined;
     const required = isStudentFilter ? 'student.read' : 'user.read';
 
     const roles = await this.prisma.adminRole.findMany({

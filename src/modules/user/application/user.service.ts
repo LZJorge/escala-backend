@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes, scryptSync } from 'node:crypto';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
+import { RedisService } from '@core/infrastructure/cache/redis.service';
+import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
 import { Result } from '@core/domain/result';
 import { Page } from '@core/domain/page';
 import { User } from '@core/domain/user.entity';
@@ -9,6 +11,7 @@ import type {
   UserListFilter,
   UserRepository,
   UserListItem,
+  AcademicSnapshot,
 } from '../domain/user.repository';
 
 @Injectable()
@@ -17,6 +20,7 @@ export class UserService {
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
   ) {}
 
   public async findAllUsers(params: {
@@ -132,6 +136,124 @@ export class UserService {
     });
   }
 
+  public async createStudent(params: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    ci: string;
+    programId: string;
+  }): Promise<
+    Result<{
+      id: string;
+      email: string;
+      program: string;
+      message: string;
+    }>
+  > {
+    const [existingEmail, existingCi, program] = await Promise.all([
+      this.userRepository.findByEmail(params.email),
+      this.userRepository.findByCi(params.ci),
+      this.prisma.program.findUnique({ where: { id: params.programId } }),
+    ]);
+
+    if (existingEmail) {
+      return Result.fail('Email already in use');
+    }
+    if (existingCi) {
+      return Result.fail('CI already in use');
+    }
+    if (!program) {
+      return Result.fail('Program not found');
+    }
+
+    const salt = randomBytes(16).toString('hex');
+    const hashed = scryptSync(params.ci, salt, 64).toString('hex');
+    const now = new Date();
+
+    const student = await this.prisma.user.create({
+      data: {
+        email: params.email,
+        password: `${salt}:${hashed}`,
+        firstName: params.firstName,
+        lastName: params.lastName,
+        ci: params.ci,
+        studentProfile: {
+          create: {
+            programId: params.programId,
+            enrollmentYear: now.getFullYear(),
+            enrollmentMonth: now.getMonth() + 1,
+          },
+        },
+      },
+      include: {
+        studentProfile: { include: { program: true } },
+      },
+    });
+
+    await this.redisService.delete(CacheKeys.PROGRAM_SUMMARY(params.programId));
+
+    return Result.ok({
+      id: student.id,
+      email: student.email,
+      program: student.studentProfile?.program?.name ?? params.programId,
+      message: 'Student registered successfully',
+    });
+  }
+
+  public async getAcademicSnapshot(
+    userId: string,
+  ): Promise<Result<AcademicSnapshot>> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      return Result.fail('User not found');
+    }
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        student: { userId },
+        status: 'ENROLLED',
+        section: { deletedAt: null, term: { status: 'ACTIVE' } },
+      },
+      include: {
+        section: {
+          include: {
+            course: true,
+            teacher: { include: { user: true } },
+          },
+        },
+      },
+    });
+
+    const passes = await this.prisma.transcript.findMany({
+      where: { student: { userId }, status: 'PASSED' },
+      select: { course: { select: { credits: true } } },
+    });
+
+    return Result.ok({
+      sections: enrollments.map(
+        (e: {
+          section: {
+            id: string;
+            name: string;
+            course: { name: string };
+            teacher: { user: { firstName: string; lastName: string } };
+          };
+        }) => ({
+          sectionId: e.section.id,
+          sectionName: e.section.name,
+          courseName: e.section.course.name,
+          teacherName:
+            `${e.section.teacher.user.firstName} ${e.section.teacher.user.lastName}`.trim(),
+        }),
+      ),
+      passedCredits: passes.reduce(
+        (sum: number, p: { course: { credits: number } }) =>
+          sum + p.course.credits,
+        0,
+      ),
+    });
+  }
+
   public async getProfile(userId: string): Promise<
     Result<{
       id: string;
@@ -206,6 +328,7 @@ export class UserService {
     ci: string;
     phone?: string;
     profiles: Array<'ADMIN' | 'STUDENT'>;
+    programId?: string;
   }): Promise<
     Result<{
       id: string;
@@ -228,6 +351,18 @@ export class UserService {
     }
     if (existingCi) {
       return Result.fail('CI already in use');
+    }
+
+    if (params.profiles.includes('STUDENT')) {
+      if (!params.programId) {
+        return Result.fail('Student profile requires a programId');
+      }
+      const program = await this.prisma.program.findUnique({
+        where: { id: params.programId },
+      });
+      if (!program) {
+        return Result.fail('Program not found');
+      }
     }
 
     const salt = randomBytes(16).toString('hex');
@@ -255,8 +390,14 @@ export class UserService {
     }
 
     if (params.profiles.includes('STUDENT')) {
+      const now = new Date();
       const studentProfile = await this.prisma.studentProfile.create({
-        data: { userId: user.id },
+        data: {
+          userId: user.id,
+          programId: params.programId as string,
+          enrollmentYear: now.getFullYear(),
+          enrollmentMonth: now.getMonth() + 1,
+        },
       });
       studentProfileId = studentProfile.id;
     }

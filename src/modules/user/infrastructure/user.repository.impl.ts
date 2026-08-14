@@ -26,7 +26,12 @@ export class PrismaUserRepository implements UserRepository {
       adminProfile: {
         roles: Array<{ role: { name: string } }>;
       } | null;
-      studentProfile: { id: string } | null;
+      studentProfile: {
+        id: string;
+        enrollmentYear: number | null;
+        enrollmentMonth: number | null;
+        programId: string | null;
+      } | null;
     };
 
     const records = await this.prisma.user.findMany({
@@ -58,6 +63,9 @@ export class PrismaUserRepository implements UserRepository {
         r.adminProfile?.roles.map(
           (ar: { role: { name: string } }) => ar.role.name,
         ) ?? [],
+      enrollmentYear: r.studentProfile?.enrollmentYear ?? null,
+      enrollmentMonth: r.studentProfile?.enrollmentMonth ?? null,
+      programId: r.studentProfile?.programId ?? null,
     }));
   }
 
@@ -102,6 +110,31 @@ export class PrismaUserRepository implements UserRepository {
     if (filter.enrollmentYear !== undefined) {
       relations.push({
         studentProfile: { enrollmentYear: filter.enrollmentYear },
+      });
+    }
+    if (filter.programId) {
+      relations.push({
+        studentProfile: {
+          OR: [
+            { programId: filter.programId },
+            {
+              enrollments: {
+                some: {
+                  section: {
+                    course: { programId: filter.programId },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+    if (filter.academicStatus) {
+      relations.push({
+        studentProfile: {
+          enrollments: { some: { status: filter.academicStatus } },
+        },
       });
     }
     if (relations.length > 0) {

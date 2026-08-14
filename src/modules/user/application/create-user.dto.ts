@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsArray,
   IsIn,
+  IsUUID,
   ArrayMinSize,
 } from 'class-validator';
 
@@ -38,6 +39,15 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   public readonly phone?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Program of the student. REQUIRED when profiles includes STUDENT.',
+    example: '3f2c1b4a-0000-4000-8000-000000000000',
+  })
+  @IsOptional()
+  @IsUUID()
+  public readonly programId?: string;
 
   @ApiProperty({
     description:

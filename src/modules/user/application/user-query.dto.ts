@@ -2,12 +2,14 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
+import { EnrollmentStatus } from '@prisma/client';
 import { PaginationDto } from '@core/infrastructure/http/pagination.dto';
 
 export class UserQueryDto extends PaginationDto {
@@ -52,6 +54,23 @@ export class UserQueryDto extends PaginationDto {
   @IsInt()
   @Min(1900)
   public readonly enrollmentYear?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Filter students enrolled in courses of a given program id (implies student profile)',
+  })
+  @IsOptional()
+  @IsString()
+  public readonly programId?: string;
+
+  @ApiPropertyOptional({
+    enum: EnrollmentStatus,
+    description:
+      'Filter students by enrollment status (ENROLLED, DROPPED or WITHDRAWN)',
+  })
+  @IsOptional()
+  @IsEnum(EnrollmentStatus)
+  public readonly academicStatus?: EnrollmentStatus;
 
   @ApiPropertyOptional({
     description: 'Created at or after (ISO 8601)',

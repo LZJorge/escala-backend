@@ -103,9 +103,12 @@ model AdminProfile {
 model StudentProfile {
   id             String  @id @default(uuid()) @db.Uuid
   userId         String  @unique @map("user_id") @db.Uuid
+  programId      String  @map("program_id") @db.Uuid
   enrollmentYear Int?    @map("enrollment_year")
+  enrollmentMonth Int?   @map("enrollment_month")
 
   user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program               Program                @relation(fields: [programId], references: [id], onDelete: Restrict)
   enrollments           Enrollment[]           @relation("StudentEnrollments")
   assessmentSubmissions AssessmentSubmission[] @relation("StudentSubmissions")
   transcripts           Transcript[]           @relation("StudentTranscripts")
@@ -180,7 +183,9 @@ model Program {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  courses Course[]
+  courses         Course[]
+  studentProfiles StudentProfile[]
+  terms           Term[]
 
   @@map("programs")
 }
@@ -225,12 +230,14 @@ model CoursePrerequisite {
 
 model Term {
   id        String     @id @default(uuid()) @db.Uuid
+  programId String     @map("program_id") @db.Uuid
   name      String
   startDate DateTime   @map("start_date")
   endDate   DateTime   @map("end_date")
   status    TermStatus @default(UPCOMING)
   deletedAt DateTime?  @map("deleted_at")
 
+  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade) // <-- NUEVO
   sections    CourseSection[]
   transcripts Transcript[]
 

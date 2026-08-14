@@ -21,6 +21,7 @@ export class PrismaTransactionMock {
   public readonly adminProfile = new PrismaModelMock();
   public readonly adminRole = new PrismaModelMock();
   public readonly studentProfile = new PrismaModelMock();
+  public readonly program = new PrismaModelMock();
 
   public constructor() {
     this.institution.create.mockResolvedValue({ id: 'tx-inst-id' });
@@ -43,6 +44,7 @@ export class PrismaServiceMock {
   public readonly adminProfile = new PrismaModelMock();
   public readonly adminRole = new PrismaModelMock();
   public readonly studentProfile = new PrismaModelMock();
+  public readonly program = new PrismaModelMock();
   public readonly $transaction = jest.fn();
 
   public constructor() {

@@ -8,6 +8,8 @@ export interface UserListFilter {
   isActive?: boolean;
   roleId?: string;
   enrollmentYear?: number;
+  programId?: string;
+  academicStatus?: 'ENROLLED' | 'DROPPED' | 'WITHDRAWN';
   createdFrom?: Date;
   createdTo?: Date;
 }
@@ -22,6 +24,19 @@ export interface UserListItem {
   isActive: boolean;
   profiles: Array<'ADMIN' | 'STUDENT'>;
   roles: string[];
+  enrollmentYear: number | null;
+  enrollmentMonth: number | null;
+  programId: string | null;
+}
+
+export interface AcademicSnapshot {
+  sections: Array<{
+    sectionId: string;
+    sectionName: string;
+    courseName: string;
+    teacherName: string;
+  }>;
+  passedCredits: number;
 }
 
 export interface UserRepository {
