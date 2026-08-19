@@ -23,6 +23,14 @@ export class UserService {
     private readonly redisService: RedisService,
   ) {}
 
+  private async emailInUse(email: string): Promise<boolean> {
+    const [existingUser, existingSuperAdmin] = await Promise.all([
+      this.userRepository.findByEmail(email),
+      this.prisma.superAdmin.findUnique({ where: { email } }),
+    ]);
+    return existingUser !== null || Boolean(existingSuperAdmin);
+  }
+
   public async findAllUsers(params: {
     page: number;
     pageSize: number;
@@ -151,7 +159,7 @@ export class UserService {
     }>
   > {
     const [existingEmail, existingCi, program] = await Promise.all([
-      this.userRepository.findByEmail(params.email),
+      this.emailInUse(params.email),
       this.userRepository.findByCi(params.ci),
       this.prisma.program.findUnique({ where: { id: params.programId } }),
     ]);
@@ -342,7 +350,7 @@ export class UserService {
     }>
   > {
     const [existingEmail, existingCi] = await Promise.all([
-      this.userRepository.findByEmail(params.email),
+      this.emailInUse(params.email),
       this.userRepository.findByCi(params.ci),
     ]);
 

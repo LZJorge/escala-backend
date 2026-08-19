@@ -530,6 +530,41 @@ describe('User (e2e)', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
+    it('returns 409 when email belongs to a super admin', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { code: 'user.create' } },
+              { permission: { code: 'user.read' } },
+            ],
+          },
+        },
+      ]);
+
+      userRepositoryMock.findByEmail.mockResolvedValue(null);
+      userRepositoryMock.findByCi.mockResolvedValue(null);
+      prismaMock.superAdmin.findUnique.mockResolvedValueOnce({
+        id: 'super-admin-id',
+        email: 'newuser@example.com',
+        password: 'hash',
+        mustChangePassword: false,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post(createUrl)
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send(validPayload)
+        .expect(409);
+
+      expect(response.body).toMatchObject({
+        statusCode: 409,
+        errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
+        path: createUrl,
+      });
+      expect(userRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
     it('returns 403 without user.create permission', async () => {
       prismaMock.adminRole.findMany.mockResolvedValue([
         {

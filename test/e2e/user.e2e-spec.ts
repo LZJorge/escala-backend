@@ -759,6 +759,50 @@ describe('Users', () => {
       });
       expect(response.body.message).toContain('CI already in use');
     });
+
+    it('returns 409 when the email already belongs to a super admin', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.create', 'user.read'],
+        'dup-superadmin-email',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('sa_password', salt, 64).toString('hex');
+
+      await prisma.superAdmin.create({
+        data: {
+          email: 'finances@test.edu',
+          password: `${salt}:${hash}`,
+          mustChangePassword: false,
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/users')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          email: 'finances@test.edu',
+          password: 'new_password',
+          firstName: 'Duplicate',
+          lastName: 'SuperAdminEmail',
+          ci: 'sa-email-ci',
+          profiles: ['STUDENT'],
+        })
+        .expect(409);
+
+      expect(response.body).toMatchObject({
+        errorCode: ErrorCodes.ERR_USER_EMAIL_EXISTS,
+        statusCode: 409,
+      });
+      expect(response.body.message).toContain('Email already in use');
+
+      const created = await prisma.user.findUnique({
+        where: { email: 'finances@test.edu' },
+      });
+      expect(created).toBeNull();
+    });
   });
 
   describe('GET /users academic filters and enrichment', () => {
