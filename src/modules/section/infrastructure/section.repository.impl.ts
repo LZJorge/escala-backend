@@ -45,6 +45,8 @@ function timeStringToDate(t: string): Date {
   return new Date(Date.UTC(1970, 0, 1, Number(h), Number(m), Number(s)));
 }
 
+const PROFESOR_ROLE = 'Profesor';
+
 @Injectable()
 export class PrismaSectionRepository implements SectionRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -65,9 +67,7 @@ export class PrismaSectionRepository implements SectionRepository {
         roles: {
           some: {
             role: {
-              permissions: {
-                some: { permission: { code: 'teacher.teach' } },
-              },
+              name: PROFESOR_ROLE,
             },
           },
         },

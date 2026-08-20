@@ -147,23 +147,10 @@ describe('Sections', () => {
       },
     });
 
-    const teacherRole = await prisma.role.create({
-      data: { name: `teacher-${suffix}`, isEditable: true },
-    });
-
-    const teachPermission = await prisma.permission.upsert({
-      where: { code: 'teacher.teach' },
+    const teacherRole = await prisma.role.upsert({
+      where: { name: 'Profesor' },
       update: {},
-      create: {
-        code: 'teacher.teach',
-        module: 'teacher',
-        description: 'Can teach sections',
-      },
-    });
-
-    await prisma.rolePermission.createMany({
-      data: [{ roleId: teacherRole.id, permissionId: teachPermission.id }],
-      skipDuplicates: true,
+      create: { name: 'Profesor', isEditable: true },
     });
 
     const teacherSalt = randomBytes(16).toString('hex');
@@ -423,7 +410,7 @@ describe('Sections', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
-    it('returns 422 when teacher is an admin without teacher.teach', async () => {
+    it('returns 422 when teacher is an admin without the Profesor role', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
@@ -496,7 +483,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-ok',
       );
 
@@ -515,7 +502,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-inv',
       );
 
@@ -539,7 +526,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-part',
       );
 
@@ -582,7 +569,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-full',
       );
 
@@ -625,7 +612,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-room',
       );
 
@@ -674,7 +661,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-adj',
       );
 
@@ -710,7 +697,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'sch-term',
       );
 
@@ -963,7 +950,7 @@ describe('Sections', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
-    it('rejects reassignment to an admin without teacher.teach', async () => {
+    it('rejects reassignment to an admin without the Profesor role', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
@@ -1102,7 +1089,7 @@ describe('Sections', () => {
       const token = await loginWithPermissions(
         app,
         prisma,
-        ['section.schedule', 'section.read'],
+        ['section.update', 'section.read'],
         'del-sch',
       );
 

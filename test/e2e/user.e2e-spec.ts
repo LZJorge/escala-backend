@@ -217,7 +217,7 @@ describe('Users', () => {
       );
     });
 
-    it('GET /users/teachers returns only admins with teacher.teach', async () => {
+    it('GET /users/teachers returns only admins with the Profesor role', async () => {
       const token = await loginWithPermissions(
         app,
         prisma,
@@ -229,20 +229,10 @@ describe('Users', () => {
       const hash = scryptSync('pass', salt, 64).toString('hex');
       const password = `${salt}:${hash}`;
 
-      const teachPermission = await prisma.permission.upsert({
-        where: { code: 'teacher.teach' },
+      const teacherRole = await prisma.role.upsert({
+        where: { name: 'Profesor' },
         update: {},
-        create: {
-          code: 'teacher.teach',
-          module: 'teacher',
-          description: 'Can teach sections',
-        },
-      });
-      const teacherRole = await prisma.role.create({
-        data: { name: `Teacher Role ${tag()}`, isEditable: true },
-      });
-      await prisma.rolePermission.create({
-        data: { roleId: teacherRole.id, permissionId: teachPermission.id },
+        create: { name: 'Profesor', isEditable: true },
       });
 
       const teacherUser = await prisma.user.create({

@@ -162,7 +162,7 @@ export class SectionController {
   }
 
   @Post(':id/schedules')
-  @RequirePermission('section.schedule')
+  @RequirePermission('section.update')
   @ApiOperation({ summary: 'Add a schedule block to a section' })
   @ApiCreatedResponse({ type: ScheduleResponseDto })
   @ApiErrors(401, 403, 404, 422)
@@ -190,7 +190,7 @@ export class SectionController {
   }
 
   @Delete(':id/schedules/:scheduleId')
-  @RequirePermission('section.schedule')
+  @RequirePermission('section.update')
   @ApiOperation({ summary: 'Remove a schedule block' })
   @ApiOkResponse({ description: 'Schedule deleted' })
   @ApiErrors(401, 403, 404)

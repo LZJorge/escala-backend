@@ -8,6 +8,8 @@ import {
   UserListFilter,
 } from '../domain/user.repository';
 
+const PROFESOR_ROLE = 'Profesor';
+
 type UserWithProfiles = {
   id: string;
   email: string;
@@ -107,9 +109,7 @@ export class PrismaUserRepository implements UserRepository {
         roles: {
           some: {
             role: {
-              permissions: {
-                some: { permission: { code: 'teacher.teach' } },
-              },
+              name: PROFESOR_ROLE,
             },
           },
         },
@@ -137,15 +137,7 @@ export class PrismaUserRepository implements UserRepository {
       adminProfileId: r.adminProfile?.id ?? null,
       canTeach:
         r.adminProfile?.roles.some(
-          (ar: {
-            role: {
-              permissions: Array<{ permission: { code: string } }>;
-            };
-          }) =>
-            ar.role.permissions.some(
-              (rp: { permission: { code: string } }) =>
-                rp.permission.code === 'teacher.teach',
-            ),
+          (ar: { role: { name: string } }) => ar.role.name === PROFESOR_ROLE,
         ) ?? false,
       enrollmentYear: r.studentProfile?.enrollmentYear ?? null,
       enrollmentMonth: r.studentProfile?.enrollmentMonth ?? null,

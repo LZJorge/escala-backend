@@ -104,7 +104,6 @@ describe('Term (e2e)', () => {
             { permission: { code: 'term.create' } },
             { permission: { code: 'term.read' } },
             { permission: { code: 'term.update' } },
-            { permission: { code: 'term.close' } },
             { permission: { code: 'term.delete' } },
           ],
         },

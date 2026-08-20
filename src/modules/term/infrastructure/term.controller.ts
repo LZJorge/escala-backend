@@ -129,7 +129,7 @@ export class TermController {
   }
 
   @Patch(':id/status')
-  @RequirePermission('term.close')
+  @RequirePermission('term.update')
   @ApiOperation({ summary: 'Change term status (UPCOMING → ACTIVE → CLOSED)' })
   @ApiOkResponse({ type: TermResponseDto })
   @ApiErrors(401, 403, 404, 409, 422)

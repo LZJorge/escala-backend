@@ -150,7 +150,6 @@ describe('Section (e2e)', () => {
             { permission: { code: 'section.read' } },
             { permission: { code: 'section.update' } },
             { permission: { code: 'section.delete' } },
-            { permission: { code: 'section.schedule' } },
           ],
         },
       },
