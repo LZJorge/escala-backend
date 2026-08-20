@@ -8,6 +8,50 @@ import {
   UserListFilter,
 } from '../domain/user.repository';
 
+type UserWithProfiles = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  ci: string;
+  phone: string | null;
+  isActive: boolean;
+  adminProfile: {
+    id: string;
+    roles: Array<{
+      role: {
+        name: string;
+        permissions: Array<{
+          permission: { code: string };
+        }>;
+      };
+    }>;
+  } | null;
+  studentProfile: {
+    id: string;
+    enrollmentYear: number | null;
+    enrollmentMonth: number | null;
+    programId: string | null;
+  } | null;
+};
+
+const USER_LIST_INCLUDE = {
+  adminProfile: {
+    include: {
+      roles: {
+        include: {
+          role: {
+            include: {
+              permissions: { include: { permission: true } },
+            },
+          },
+        },
+      },
+    },
+  },
+  studentProfile: true,
+} as const;
+
 @Injectable()
 export class PrismaUserRepository implements UserRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,39 +59,66 @@ export class PrismaUserRepository implements UserRepository {
   public async findAll(
     params: { skip: number; take: number } & UserListFilter,
   ): Promise<UserListItem[]> {
-    type UserWithProfiles = {
-      id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
-      ci: string;
-      phone: string | null;
-      isActive: boolean;
-      adminProfile: {
-        roles: Array<{ role: { name: string } }>;
-      } | null;
-      studentProfile: {
-        id: string;
-        enrollmentYear: number | null;
-        enrollmentMonth: number | null;
-        programId: string | null;
-      } | null;
-    };
-
     const records = await this.prisma.user.findMany({
       where: this.buildWhere(params),
-      include: {
-        adminProfile: {
-          include: { roles: { include: { role: true } } },
-        },
-        studentProfile: true,
-      },
+      include: USER_LIST_INCLUDE,
       orderBy: { createdAt: 'asc' },
       skip: params.skip,
       take: params.take,
     });
 
-    return records.map((r: UserWithProfiles) => ({
+    return records.map((r: UserWithProfiles) => this.toListItem(r));
+  }
+
+  public async findTeachers(
+    params: { skip: number; take: number } & UserListFilter,
+  ): Promise<UserListItem[]> {
+    const records = await this.prisma.user.findMany({
+      where: {
+        AND: [this.teacherWhere(), this.buildWhere(params)],
+      },
+      include: USER_LIST_INCLUDE,
+      orderBy: { createdAt: 'asc' },
+      skip: params.skip,
+      take: params.take,
+    });
+
+    return records.map((r: UserWithProfiles) => this.toListItem(r));
+  }
+
+  public async count(filter?: UserListFilter): Promise<number> {
+    return this.prisma.user.count({
+      where: filter ? this.buildWhere(filter) : undefined,
+    });
+  }
+
+  public async countTeachers(filter?: UserListFilter): Promise<number> {
+    return this.prisma.user.count({
+      where: {
+        AND: [this.teacherWhere(), filter ? this.buildWhere(filter) : {}],
+      },
+    });
+  }
+
+  private teacherWhere(): Prisma.UserWhereInput {
+    return {
+      deletedAt: null,
+      adminProfile: {
+        roles: {
+          some: {
+            role: {
+              permissions: {
+                some: { permission: { code: 'teacher.teach' } },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  private toListItem(r: UserWithProfiles): UserListItem {
+    return {
       id: r.id,
       email: r.email,
       firstName: r.firstName,
@@ -63,16 +134,23 @@ export class PrismaUserRepository implements UserRepository {
         r.adminProfile?.roles.map(
           (ar: { role: { name: string } }) => ar.role.name,
         ) ?? [],
+      adminProfileId: r.adminProfile?.id ?? null,
+      canTeach:
+        r.adminProfile?.roles.some(
+          (ar: {
+            role: {
+              permissions: Array<{ permission: { code: string } }>;
+            };
+          }) =>
+            ar.role.permissions.some(
+              (rp: { permission: { code: string } }) =>
+                rp.permission.code === 'teacher.teach',
+            ),
+        ) ?? false,
       enrollmentYear: r.studentProfile?.enrollmentYear ?? null,
       enrollmentMonth: r.studentProfile?.enrollmentMonth ?? null,
       programId: r.studentProfile?.programId ?? null,
-    }));
-  }
-
-  public async count(filter?: UserListFilter): Promise<number> {
-    return this.prisma.user.count({
-      where: filter ? this.buildWhere(filter) : undefined,
-    });
+    };
   }
 
   private buildWhere(filter: UserListFilter): Prisma.UserWhereInput {

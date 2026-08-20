@@ -34,7 +34,9 @@ describe('User (e2e)', () => {
     redisMock = new RedisServiceMock();
     userRepositoryMock = {
       findAll: jest.fn(),
+      findTeachers: jest.fn(),
       count: jest.fn(),
+      countTeachers: jest.fn(),
       findById: jest.fn(),
       findByEmail: jest.fn(),
       findByCi: jest.fn(),
@@ -191,6 +193,78 @@ describe('User (e2e)', () => {
         path: '/users/me',
       });
       expect(response.body).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('GET /users/teachers', () => {
+    it('returns paginated teachers and passes filters for user.read permission', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([
+        {
+          role: {
+            permissions: [{ permission: { code: 'user.read' } }],
+          },
+        },
+      ]);
+      userRepositoryMock.findTeachers.mockResolvedValue([
+        {
+          id: 'teacher-1',
+          email: 'prof@test.edu',
+          firstName: 'Prof',
+          lastName: 'One',
+          ci: 't-1',
+          phone: null,
+          isActive: true,
+          profiles: ['ADMIN'],
+          roles: ['Profesor'],
+          adminProfileId: 'ap-1',
+          canTeach: true,
+          enrollmentYear: null,
+          enrollmentMonth: null,
+          programId: null,
+        },
+      ]);
+      userRepositoryMock.countTeachers.mockResolvedValue(1);
+
+      const response = await request(app.getHttpServer())
+        .get('/users/teachers')
+        .query({ q: 'prof', isActive: 'true', page: 2, pageSize: 10 })
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(200);
+
+      expect(userRepositoryMock.findTeachers).toHaveBeenCalledWith({
+        skip: 10,
+        take: 10,
+        q: 'prof',
+        isActive: true,
+      });
+      expect(userRepositoryMock.countTeachers).toHaveBeenCalledWith({
+        q: 'prof',
+        isActive: true,
+      });
+      expect(response.body.meta).toMatchObject({
+        page: 2,
+        pageSize: 10,
+        total: 1,
+        totalPages: 1,
+      });
+      expect(response.body.data).toEqual([
+        expect.objectContaining({ email: 'prof@test.edu', canTeach: true }),
+      ]);
+    });
+
+    it('returns 403 without user.read permission', async () => {
+      prismaMock.adminRole.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/users/teachers')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .expect(403);
+
+      expect(response.body).toMatchObject({
+        statusCode: 403,
+        errorCode: ErrorCodes.SEC_AUTH_INSUFFICIENT_PERMISSIONS,
+        path: '/users/teachers',
+      });
     });
   });
 

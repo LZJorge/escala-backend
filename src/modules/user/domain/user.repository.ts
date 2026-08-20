@@ -24,6 +24,8 @@ export interface UserListItem {
   isActive: boolean;
   profiles: Array<'ADMIN' | 'STUDENT'>;
   roles: string[];
+  adminProfileId: string | null;
+  canTeach: boolean;
   enrollmentYear: number | null;
   enrollmentMonth: number | null;
   programId: string | null;
@@ -43,7 +45,11 @@ export interface UserRepository {
   findAll(
     params: { skip: number; take: number } & UserListFilter,
   ): Promise<UserListItem[]>;
+  findTeachers(
+    params: { skip: number; take: number } & UserListFilter,
+  ): Promise<UserListItem[]>;
   count(filter?: UserListFilter): Promise<number>;
+  countTeachers(filter?: UserListFilter): Promise<number>;
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
   findByCi(ci: string): Promise<User | null>;

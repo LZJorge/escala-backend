@@ -164,6 +164,7 @@ describe('Users', () => {
   });
 
   describe('GET /users', () => {
+    const tag = (): string => randomBytes(4).toString('hex');
     it('returns all users with their roles for user.read permission', async () => {
       const token = await loginWithPermissions(
         app,
@@ -214,6 +215,102 @@ describe('Users', () => {
           }),
         ]),
       );
+    });
+
+    it('GET /users/teachers returns only admins with teacher.teach', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['user.read'],
+        'teachers-lister',
+      );
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('pass', salt, 64).toString('hex');
+      const password = `${salt}:${hash}`;
+
+      const teachPermission = await prisma.permission.upsert({
+        where: { code: 'teacher.teach' },
+        update: {},
+        create: {
+          code: 'teacher.teach',
+          module: 'teacher',
+          description: 'Can teach sections',
+        },
+      });
+      const teacherRole = await prisma.role.create({
+        data: { name: `Teacher Role ${tag()}`, isEditable: true },
+      });
+      await prisma.rolePermission.create({
+        data: { roleId: teacherRole.id, permissionId: teachPermission.id },
+      });
+
+      const teacherUser = await prisma.user.create({
+        data: {
+          email: `prof-list-${tag()}@test.edu`,
+          password,
+          firstName: 'Prof',
+          lastName: 'List',
+          ci: `prof-list-ci-${tag()}`,
+        },
+      });
+      const teacherProfile = await prisma.adminProfile.create({
+        data: { userId: teacherUser.id },
+      });
+      await prisma.adminRole.create({
+        data: { adminProfileId: teacherProfile.id, roleId: teacherRole.id },
+      });
+
+      const plainUser = await prisma.user.create({
+        data: {
+          email: `plain-list-${tag()}@test.edu`,
+          password,
+          firstName: 'Plain',
+          lastName: 'List',
+          ci: `plain-list-ci-${tag()}`,
+        },
+      });
+      await prisma.adminProfile.create({ data: { userId: plainUser.id } });
+
+      const studentUser = await prisma.user.create({
+        data: {
+          email: `stu-list-${tag()}@test.edu`,
+          password,
+          firstName: 'Stu',
+          lastName: 'List',
+          ci: `stu-list-ci-${tag()}`,
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/users/teachers')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.meta).toMatchObject({
+        page: 1,
+        pageSize: 20,
+        total: 1,
+        totalPages: 1,
+      });
+      expect(response.body.data).toEqual([
+        expect.objectContaining({
+          email: teacherUser.email,
+          adminProfileId: teacherProfile.id,
+          canTeach: true,
+        }),
+      ]);
+      const emails = response.body.data.map((u: { email: string }) => u.email);
+      expect(emails).not.toContain(plainUser.email);
+      expect(emails).not.toContain(studentUser.email);
+
+      const searchResponse = await request(app.getHttpServer())
+        .get(`/users/teachers?q=${teacherUser.email}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(searchResponse.body.meta.total).toBe(1);
+      expect(searchResponse.body.data[0].email).toBe(teacherUser.email);
     });
 
     it('filters users by profile', async () => {

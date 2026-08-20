@@ -401,6 +401,27 @@ describe('Section (e2e)', () => {
       expect(response.body).toHaveProperty('timestamp');
     });
 
+    it('returns 422 when reassigning a teacher without teacher permission', async () => {
+      sectionRepoMock.findById.mockResolvedValue({
+        section: buildSection({ capacity: 30 }, 'sec-1'),
+        schedules: [],
+      });
+      sectionRepoMock.isTeacher.mockResolvedValueOnce(false);
+
+      const response = await request(app.getHttpServer())
+        .patch('/sections/sec-1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ teacherId: '550e8400-e29b-41d4-a716-446655440099' })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_SECTION_UPDATE_FAILED,
+        path: '/sections/sec-1',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
     it('returns 404 when not found', async () => {
       sectionRepoMock.findById.mockResolvedValue(null);
 

@@ -151,6 +151,21 @@ describe('Sections', () => {
       data: { name: `teacher-${suffix}`, isEditable: true },
     });
 
+    const teachPermission = await prisma.permission.upsert({
+      where: { code: 'teacher.teach' },
+      update: {},
+      create: {
+        code: 'teacher.teach',
+        module: 'teacher',
+        description: 'Can teach sections',
+      },
+    });
+
+    await prisma.rolePermission.createMany({
+      data: [{ roleId: teacherRole.id, permissionId: teachPermission.id }],
+      skipDuplicates: true,
+    });
+
     const teacherSalt = randomBytes(16).toString('hex');
     const teacherHash = scryptSync('pass', teacherSalt, 64).toString('hex');
 
@@ -397,6 +412,53 @@ describe('Sections', () => {
           courseId,
           termId,
           teacherId: studentId,
+        })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_SECTION_CREATION_FAILED,
+        path: '/sections',
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('returns 422 when teacher is an admin without teacher.teach', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['section.create', 'section.read'],
+        'create-plain-admin',
+      );
+
+      const { termId, courseId } = await seedData();
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('pass', salt, 64).toString('hex');
+
+      const plainAdmin = await prisma.user.create({
+        data: {
+          email: `plain-admin-${tag()}@test.edu`,
+          password: `${salt}:${hash}`,
+          firstName: 'Plain',
+          lastName: 'Admin',
+          ci: `plain-admin-ci-${tag()}`,
+        },
+      });
+
+      const plainProfile = await prisma.adminProfile.create({
+        data: { userId: plainAdmin.id },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/sections')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          name: 'No Teach Permission',
+          capacity: 30,
+          courseId,
+          termId,
+          teacherId: plainProfile.id,
         })
         .expect(422);
 
@@ -891,6 +953,51 @@ describe('Sections', () => {
         .patch(`/sections/${section.id}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Should Fail' })
+        .expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        errorCode: ErrorCodes.ERR_SECTION_UPDATE_FAILED,
+        path: `/sections/${section.id}`,
+      });
+      expect(response.body).toHaveProperty('timestamp');
+    });
+
+    it('rejects reassignment to an admin without teacher.teach', async () => {
+      const token = await loginWithPermissions(
+        app,
+        prisma,
+        ['section.update', 'section.read'],
+        'patch-plain-admin',
+      );
+
+      const { termId, courseId, teacherId } = await seedData();
+
+      const section = await prisma.courseSection.create({
+        data: { courseId, termId, teacherId, name: 'Reassign', capacity: 30 },
+      });
+
+      const salt = randomBytes(16).toString('hex');
+      const hash = scryptSync('pass', salt, 64).toString('hex');
+
+      const plainAdmin = await prisma.user.create({
+        data: {
+          email: `plain-admin-${tag()}@test.edu`,
+          password: `${salt}:${hash}`,
+          firstName: 'Plain',
+          lastName: 'Admin',
+          ci: `plain-admin-ci-${tag()}`,
+        },
+      });
+
+      const plainProfile = await prisma.adminProfile.create({
+        data: { userId: plainAdmin.id },
+      });
+
+      const response = await request(app.getHttpServer())
+        .patch(`/sections/${section.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ teacherId: plainProfile.id })
         .expect(422);
 
       expect(response.body).toMatchObject({

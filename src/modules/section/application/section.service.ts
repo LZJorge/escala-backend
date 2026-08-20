@@ -267,6 +267,13 @@ export class SectionService {
     }
 
     if (
+      params.teacherId !== undefined &&
+      !(await this.repository.isTeacher(params.teacherId))
+    ) {
+      return Result.fail('The assigned teacher is not a teacher');
+    }
+
+    if (
       params.capacity !== undefined &&
       params.capacity < existing.section.capacity
     ) {

@@ -36,6 +36,7 @@ import { Page } from '@core/domain/page';
 import { DomainException } from '@core/domain/domain.exception';
 import { ErrorCodes } from '@core/domain/error-codes';
 import { UserQueryDto } from '../application/user-query.dto';
+import { TeacherQueryDto } from '../application/teacher-query.dto';
 import { UserListGuard } from './user-list.guard';
 
 @ApiTags('Users')
@@ -79,6 +80,30 @@ export class UserController {
       page: query.page,
       pageSize: query.pageSize,
       filter,
+    });
+    return result.value;
+  }
+
+  @Get('teachers')
+  @UseGuards(JwtAuthGuard, UserListGuard)
+  @ApiOperation({
+    summary:
+      'List users eligible to teach sections (paginated, filters: q, isActive, roleId)',
+  })
+  @ApiOkResponse({ description: 'Paginated teachers with their roles' })
+  @ApiErrors(401, 403)
+  public async findTeachers(
+    @Query() query: TeacherQueryDto,
+  ): Promise<Page<UserListItem>> {
+    const result = await this.userService.findTeachers({
+      page: query.page,
+      pageSize: query.pageSize,
+      filter: {
+        q: query.q,
+        isActive:
+          query.isActive === undefined ? undefined : query.isActive === 'true',
+        roleId: query.roleId,
+      },
     });
     return result.value;
   }

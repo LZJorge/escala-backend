@@ -55,6 +55,30 @@ export class UserService {
     });
   }
 
+  public async findTeachers(params: {
+    page: number;
+    pageSize: number;
+    filter: UserListFilter;
+  }): Promise<Result<Page<UserListItem>>> {
+    const [teachers, total] = await Promise.all([
+      this.userRepository.findTeachers({
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+        ...params.filter,
+      }),
+      this.userRepository.countTeachers(params.filter),
+    ]);
+    return Result.ok({
+      meta: {
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+        totalPages: Math.ceil(total / params.pageSize),
+      },
+      data: teachers,
+    });
+  }
+
   public async getMe(jwt: {
     sub: string;
     email: string;
