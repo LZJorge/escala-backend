@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import { DayOfWeek, PrismaClient, TermStatus } from '@prisma/client';
 import { randomBytes, scryptSync } from 'node:crypto';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -33,6 +33,7 @@ const PERMISSIONS: Array<{ code: string; module: string; description: string }> 
   { code: 'section.update', module: 'section', description: 'Modify section capacity or teacher' },
   { code: 'section.delete', module: 'section', description: 'Delete course sections' },
   { code: 'section.schedule', module: 'section', description: 'Manage section schedules' },
+  { code: 'teacher.teach', module: 'teacher', description: 'Can be assigned as a teacher of a section' },
   { code: 'term.create', module: 'term', description: 'Create academic terms' },
   { code: 'term.read', module: 'term', description: 'View academic terms' },
   { code: 'term.update', module: 'term', description: 'Modify term dates' },
@@ -73,7 +74,13 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
     },
     {
       name: 'Profesor',
-      permissions: ['program.read', 'course.read', 'section.read', 'term.read'],
+      permissions: [
+        'program.read',
+        'course.read',
+        'section.read',
+        'term.read',
+        'teacher.teach',
+      ],
     },
   ];
 
@@ -129,6 +136,42 @@ async function createDemoUsers(prisma: PrismaClient): Promise<void> {
       lastName: 'Mendez',
       ci: '10000002',
       adminProfile: { department: 'Ciencias' },
+      roleNames: ['Profesor'],
+      studentProfile: null,
+    },
+    {
+      email: 'profesor2@escala.edu.ve',
+      firstName: 'Jose',
+      lastName: 'Perez',
+      ci: '10000008',
+      adminProfile: { department: 'Programación' },
+      roleNames: ['Profesor'],
+      studentProfile: null,
+    },
+    {
+      email: 'profesor3@escala.edu.ve',
+      firstName: 'Maria',
+      lastName: 'Fernandez',
+      ci: '10000009',
+      adminProfile: { department: 'Matemáticas' },
+      roleNames: ['Profesor'],
+      studentProfile: null,
+    },
+    {
+      email: 'profesor4@escala.edu.ve',
+      firstName: 'Ricardo',
+      lastName: 'Gomez',
+      ci: '10000010',
+      adminProfile: { department: 'Física' },
+      roleNames: ['Profesor'],
+      studentProfile: null,
+    },
+    {
+      email: 'profesor5@escala.edu.ve',
+      firstName: 'Elena',
+      lastName: 'Ruiz',
+      ci: '10000011',
+      adminProfile: { department: 'Comunicación' },
       roleNames: ['Profesor'],
       studentProfile: null,
     },
@@ -354,6 +397,218 @@ async function createDemoProgram(prisma: PrismaClient): Promise<void> {
   console.log(`Seeded ${prereqRows.length} prerequisites.`);
 }
 
+const DEMO_TERMS: Array<{
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: TermStatus;
+}> = [
+  { name: '2025-2', startDate: '2025-07-07', endDate: '2025-12-12', status: 'CLOSED' },
+  { name: '2026-1', startDate: '2026-01-12', endDate: '2026-06-26', status: 'CLOSED' },
+  { name: '2026-2', startDate: '2026-07-06', endDate: '2026-12-11', status: 'ACTIVE' },
+  { name: '2027-1', startDate: '2027-01-11', endDate: '2027-06-25', status: 'UPCOMING' },
+];
+
+const FUTURE_TERM_NAME = '2027-1';
+
+const FUTURE_SECTIONS: Array<{
+  courseCode: string;
+  name: string;
+  capacity: number;
+  schedules: Array<{
+    dayOfWeek: DayOfWeek;
+    startTime: string;
+    endTime: string;
+    room: string;
+  }>;
+}> = [
+  {
+    courseCode: 'INF101',
+    name: 'A',
+    capacity: 35,
+    schedules: [
+      { dayOfWeek: 'MONDAY', startTime: '08:00:00', endTime: '09:30:00', room: 'L-101' },
+      { dayOfWeek: 'WEDNESDAY', startTime: '08:00:00', endTime: '09:30:00', room: 'L-101' },
+    ],
+  },
+  {
+    courseCode: 'INF101',
+    name: 'B',
+    capacity: 35,
+    schedules: [
+      { dayOfWeek: 'MONDAY', startTime: '10:00:00', endTime: '11:30:00', room: 'L-102' },
+      { dayOfWeek: 'WEDNESDAY', startTime: '10:00:00', endTime: '11:30:00', room: 'L-102' },
+    ],
+  },
+  {
+    courseCode: 'MAT101',
+    name: 'A',
+    capacity: 35,
+    schedules: [
+      { dayOfWeek: 'TUESDAY', startTime: '08:00:00', endTime: '09:30:00', room: 'A-201' },
+      { dayOfWeek: 'THURSDAY', startTime: '08:00:00', endTime: '09:30:00', room: 'A-201' },
+    ],
+  },
+  {
+    courseCode: 'MAT101',
+    name: 'B',
+    capacity: 35,
+    schedules: [
+      { dayOfWeek: 'TUESDAY', startTime: '10:00:00', endTime: '11:30:00', room: 'A-202' },
+      { dayOfWeek: 'THURSDAY', startTime: '10:00:00', endTime: '11:30:00', room: 'A-202' },
+    ],
+  },
+  {
+    courseCode: 'FIS101',
+    name: 'A',
+    capacity: 30,
+    schedules: [
+      { dayOfWeek: 'MONDAY', startTime: '13:00:00', endTime: '14:30:00', room: 'F-101' },
+      { dayOfWeek: 'WEDNESDAY', startTime: '13:00:00', endTime: '14:30:00', room: 'F-101' },
+    ],
+  },
+  {
+    courseCode: 'COM101',
+    name: 'A',
+    capacity: 30,
+    schedules: [{ dayOfWeek: 'FRIDAY', startTime: '08:00:00', endTime: '10:30:00', room: 'A-105' }],
+  },
+  {
+    courseCode: 'INF102',
+    name: 'A',
+    capacity: 30,
+    schedules: [
+      { dayOfWeek: 'TUESDAY', startTime: '13:00:00', endTime: '14:30:00', room: 'L-103' },
+      { dayOfWeek: 'THURSDAY', startTime: '13:00:00', endTime: '14:30:00', room: 'L-103' },
+    ],
+  },
+  {
+    courseCode: 'INF201',
+    name: 'A',
+    capacity: 30,
+    schedules: [
+      { dayOfWeek: 'MONDAY', startTime: '09:00:00', endTime: '10:30:00', room: 'L-201' },
+      { dayOfWeek: 'WEDNESDAY', startTime: '09:00:00', endTime: '10:30:00', room: 'L-201' },
+    ],
+  },
+  {
+    courseCode: 'MAT201',
+    name: 'A',
+    capacity: 30,
+    schedules: [
+      { dayOfWeek: 'TUESDAY', startTime: '15:00:00', endTime: '16:30:00', room: 'A-203' },
+      { dayOfWeek: 'THURSDAY', startTime: '15:00:00', endTime: '16:30:00', room: 'A-203' },
+    ],
+  },
+];
+
+async function createDemoTermsAndSections(prisma: PrismaClient): Promise<void> {
+  const program = await prisma.program.findFirst({
+    where: { name: DEMO_PROGRAM_NAME, deletedAt: null },
+  });
+  if (!program) {
+    throw new Error(`Demo program ${DEMO_PROGRAM_NAME} must exist before terms`);
+  }
+
+  for (const t of DEMO_TERMS) {
+    const existing = await prisma.term.findFirst({
+      where: { programId: program.id, name: t.name, deletedAt: null },
+    });
+    if (existing) {
+      continue;
+    }
+    await prisma.term.create({
+      data: {
+        programId: program.id,
+        name: t.name,
+        startDate: new Date(t.startDate),
+        endDate: new Date(t.endDate),
+        status: t.status,
+      },
+    });
+    console.log(`Term created: ${t.name} (${t.status})`);
+  }
+
+  const term = await prisma.term.findFirst({
+    where: { programId: program.id, name: FUTURE_TERM_NAME, deletedAt: null },
+  });
+  if (!term) {
+    throw new Error(`Term ${FUTURE_TERM_NAME} missing after seeding`);
+  }
+
+  const courses = await prisma.course.findMany({
+    where: { programId: program.id, deletedAt: null },
+  });
+  const courseIdByCode = new Map(courses.map((c) => [c.code, c.id]));
+
+  const teachers = await prisma.adminProfile.findMany({
+    where: { user: { deletedAt: null } },
+    include: { roles: { include: { role: true } } },
+  });
+  const profesorProfiles = teachers.filter((t) =>
+    t.roles.some((r) => r.role.name === 'Profesor'),
+  );
+  if (profesorProfiles.length === 0) {
+    throw new Error('At least one Profesor is required to seed sections');
+  }
+
+  for (const [i, s] of FUTURE_SECTIONS.entries()) {
+    const courseId = courseIdByCode.get(s.courseCode);
+    if (!courseId) {
+      console.warn(`Skipping section ${s.courseCode} ${s.name}: course not found.`);
+      continue;
+    }
+    const section = await prisma.courseSection.findFirst({
+      where: { courseId, termId: term.id, name: s.name, deletedAt: null },
+    });
+    if (section) {
+      for (const sch of s.schedules) {
+        const existing = await prisma.sectionSchedule.findFirst({
+          where: {
+            sectionId: section.id,
+            dayOfWeek: sch.dayOfWeek,
+            startTime: new Date(`1970-01-01T${sch.startTime}`),
+          },
+        });
+        if (existing) {
+          continue;
+        }
+        await prisma.sectionSchedule.create({
+          data: {
+            sectionId: section.id,
+            dayOfWeek: sch.dayOfWeek,
+            startTime: new Date(`1970-01-01T${sch.startTime}`),
+            endTime: new Date(`1970-01-01T${sch.endTime}`),
+            roomIdentifier: sch.room,
+          },
+        });
+        console.log(`Schedule created: ${s.courseCode} ${s.name} ${sch.dayOfWeek} ${sch.startTime}`);
+      }
+      continue;
+    }
+    const created = await prisma.courseSection.create({
+      data: {
+        courseId,
+        termId: term.id,
+        teacherId: profesorProfiles[i % profesorProfiles.length].id,
+        name: s.name,
+        capacity: s.capacity,
+      },
+    });
+    console.log(`Section created: ${s.courseCode} ${s.name} (${FUTURE_TERM_NAME})`);
+    await prisma.sectionSchedule.createMany({
+      data: s.schedules.map((sch) => ({
+        sectionId: created.id,
+        dayOfWeek: sch.dayOfWeek,
+        startTime: new Date(`1970-01-01T${sch.startTime}`),
+        endTime: new Date(`1970-01-01T${sch.endTime}`),
+        roomIdentifier: sch.room,
+      })),
+    });
+    console.log(`Created ${s.schedules.length} schedules for ${s.courseCode} ${s.name}.`);
+  }
+}
+
 async function seed(): Promise<void> {
   console.log('Seeding permissions...');
 
@@ -405,6 +660,8 @@ async function seed(): Promise<void> {
   await createDemoProgram(prisma);
 
   await createDemoUsers(prisma);
+
+  await createDemoTermsAndSections(prisma);
 
   await prisma.$disconnect();
 }

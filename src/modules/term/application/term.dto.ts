@@ -58,6 +58,20 @@ export class ChangeTermStatusDto {
   public readonly status: TermStatus;
 }
 
+export class MissingCourseResponseDto {
+  @ApiProperty()
+  public id: string;
+
+  @ApiProperty()
+  public code: string;
+
+  @ApiProperty()
+  public name: string;
+
+  @ApiProperty()
+  public termLevel: number;
+}
+
 export class TermResponseDto {
   @ApiProperty()
   public id: string;

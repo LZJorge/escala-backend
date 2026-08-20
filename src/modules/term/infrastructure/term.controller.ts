@@ -22,6 +22,7 @@ import {
   UpdateTermDto,
   ChangeTermStatusDto,
   TermResponseDto,
+  MissingCourseResponseDto,
 } from '../application/term.dto';
 import { ApiErrors } from '@core/infrastructure/http/api-error-response.decorator';
 import { DomainException } from '@core/domain/domain.exception';
@@ -152,6 +153,29 @@ export class TermController {
 
       throw new DomainException(
         ErrorCodes.ERR_TERM_CLOSE_FAILED,
+        result.error as string,
+      );
+    }
+
+    return result.value;
+  }
+
+  @Get(':id/missing-courses')
+  @RequirePermission('term.read')
+  @ApiOperation({
+    summary:
+      'List active program courses without any section assigned in this term',
+  })
+  @ApiOkResponse({ type: [MissingCourseResponseDto] })
+  @ApiErrors(404)
+  public async getMissingCourses(
+    @Param('id') id: string,
+  ): Promise<MissingCourseResponseDto[]> {
+    const result = await this.service.getMissingCourses(id);
+
+    if (result.isFailure) {
+      throw new DomainException(
+        ErrorCodes.ERR_TERM_NOT_FOUND,
         result.error as string,
       );
     }

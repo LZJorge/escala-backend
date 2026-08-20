@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@core/infrastructure/database/prisma.service';
-import { TermRepository } from '../domain/term.repository';
+import {
+  TermRepository,
+  MissingCourseSummary,
+} from '../domain/term.repository';
 import { Term } from '../domain/term.entity';
 
 import type { Term as PrismaTerm } from '@prisma/client';
@@ -95,6 +98,29 @@ export class PrismaTermRepository implements TermRepository {
   public async countSections(termId: string): Promise<number> {
     return this.prisma.courseSection.count({
       where: { termId },
+    });
+  }
+
+  public async findMissingCourses(
+    termId: string,
+    programId: string,
+  ): Promise<MissingCourseSummary[]> {
+    return this.prisma.course.findMany({
+      where: {
+        programId,
+        isActive: true,
+        deletedAt: null,
+        sections: {
+          none: { termId },
+        },
+      },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        termLevel: true,
+      },
+      orderBy: { termLevel: 'asc' },
     });
   }
 

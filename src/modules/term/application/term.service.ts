@@ -4,7 +4,10 @@ import { RedisService } from '@core/infrastructure/cache/redis.service';
 import { CacheKeys } from '@core/infrastructure/cache/cache-keys.factory';
 import type { ValidCacheKey } from '@core/infrastructure/cache/cache-keys.factory';
 import { TERM_REPOSITORY } from '../domain/term.repository';
-import type { TermRepository } from '../domain/term.repository';
+import type {
+  TermRepository,
+  MissingCourseSummary,
+} from '../domain/term.repository';
 import { Term } from '../domain/term.entity';
 import type { TermStatus } from '@prisma/client';
 import type { TermResponseDto } from './term.dto';
@@ -316,6 +319,23 @@ export class TermService {
     ]);
 
     return Result.ok(this.toResponse(saved));
+  }
+
+  public async getMissingCourses(
+    termId: string,
+  ): Promise<Result<MissingCourseSummary[]>> {
+    const term = await this.repository.findById(termId);
+
+    if (!term) {
+      return Result.fail('Term not found');
+    }
+
+    const courses = await this.repository.findMissingCourses(
+      termId,
+      term.programId,
+    );
+
+    return Result.ok(courses);
   }
 
   public async delete(id: string): Promise<Result<void>> {
